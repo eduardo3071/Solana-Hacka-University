@@ -12,7 +12,6 @@
 import {
   Keypair,
   LAMPORTS_PER_SOL,
-  sendAndConfirmTransaction,
   SystemProgram,
   Transaction,
   TransactionMessage,
@@ -95,7 +94,14 @@ const abastecer = new Transaction().add(
     lamports: ABASTECER,
   }),
 );
-await sendAndConfirmTransaction(conn, abastecer, [tesoureira.keypair]);
+// Envia e confirma por consulta, não por `sendAndConfirmTransaction`: aquele
+// abre uma inscrição por websocket, e num RPC dedicado o wss pode estar em
+// outro host ou exigir plano diferente. Com polling, o ciclo inteiro fala só
+// HTTP e funciona em qualquer provedor.
+const assinaturaAbastecer = await conn.sendTransaction(abastecer, [
+  tesoureira.keypair,
+]);
+await confirmar(conn, assinaturaAbastecer);
 ok(`saldo do caixa: ${sol(await conn.getBalance(vaultPda))} SOL`);
 
 /* ── 3 · propõe a saída ─────────────────────────────────────────────────── */
