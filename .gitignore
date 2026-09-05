@@ -11,6 +11,18 @@ dist/
 .env*.local
 .env.production
 
+# Chaves da Solana. O formato padrão de keypair é um .json com o array de
+# bytes do segredo — não parece segredo à primeira vista e passa despercebido
+# num `git add .`. Estes nomes cobrem o que o solana-keygen e os scripts de
+# devnet costumam gerar.
+*.keypair.json
+id.json
+keypair*.json
+wallet*.json
+**/keys/
+**/.keys/
+**/keypairs/
+
 # Vercel / TS
 .vercel
 *.tsbuildinfo
