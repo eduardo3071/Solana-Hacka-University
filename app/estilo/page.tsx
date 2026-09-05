@@ -127,11 +127,17 @@ export default function FolhaDeEstilo() {
               titulo="âmbar · espera, progresso"
               detalhe="#F5C73D sobre #3A3018 · rubrica Marketing"
             />
+            {/* Único acento que não passa em contraste como texto pequeno:
+                3,88:1 sobre a superfície, contra os 4,5:1 da WCAG AA. Por isso
+                o título desta linha é tinta, e não roxo — e por isso
+                `TEXTO_SOBRE_TINGIDO` mapeia roxo para `ink-2` em todo o
+                produto. Aqui está escrito, não subentendido. */}
             <Acento
               icone={Users}
               acento="purple"
+              tituloEmAcento={false}
               titulo="roxo · associados, pessoas"
-              detalhe="#AF57DB sobre #2F2C4D · rubrica Associados"
+              detalhe="#AF57DB sobre #2F2C4D · só ícone e chip, nunca texto"
             />
             <Acento
               icone={Lock}
@@ -505,19 +511,24 @@ function Acento({
   acento,
   titulo,
   detalhe,
+  tituloEmAcento = true,
 }: {
   icone: typeof Square;
   acento: 'blue' | 'green' | 'amber' | 'purple' | 'red';
   titulo: string;
   detalhe: string;
+  /** Falso quando o acento não passa em contraste como texto pequeno. */
+  tituloEmAcento?: boolean;
 }) {
-  const cor = {
-    blue: 'text-blue',
-    green: 'text-green',
-    amber: 'text-amber',
-    purple: 'text-purple',
-    red: 'text-red',
-  }[acento];
+  const cor = tituloEmAcento
+    ? {
+        blue: 'text-blue',
+        green: 'text-green',
+        amber: 'text-amber',
+        purple: 'text-purple',
+        red: 'text-red',
+      }[acento]
+    : 'text-ink';
 
   return (
     <div className="flex items-center gap-3 rounded-tile border border-line bg-surface px-3 py-[11px]">

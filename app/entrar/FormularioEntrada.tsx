@@ -41,7 +41,10 @@ export function FormularioEntrada({ aviso }: { aviso?: string }) {
           autoComplete="email"
           required
           placeholder="voce@grad.ufsc.br"
-          className="w-full rounded-btn border border-line bg-surface px-3.5 py-[13px] text-[13px] font-medium text-ink placeholder:text-ink-3 focus:border-blue focus:outline-none"
+          /* Sem `outline-none`: a borda azul sozinha é 1px de diferença, e
+             quem navega por teclado precisa enxergar onde está. O anel de
+             foco global fica. */
+          className="w-full rounded-btn border border-line bg-surface px-3.5 py-[13px] text-[13px] font-medium text-ink placeholder:text-ink-3 focus:border-blue"
         />
       </div>
 

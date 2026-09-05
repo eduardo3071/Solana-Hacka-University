@@ -48,11 +48,41 @@ export function ehPapel(v: unknown): v is Papel {
   return typeof v === 'string' && v in ENV_DO_PAPEL;
 }
 
+/**
+ * A conexão com a rede. Devnet, sempre.
+ *
+ * Duas guardas, e nenhuma delas é decoração:
+ *
+ * Mainnet é recusada em qualquer caminho, não só no pagamento de demonstração.
+ * Este repositório não movimenta dinheiro de verdade, e a hora de descobrir o
+ * contrário não é depois da transação confirmada.
+ *
+ * Em produção o RPC dedicado é obrigatório. O RPC público de devnet estrangula
+ * por limite de requisições, e ele faz isso no meio da demonstração — foi
+ * exatamente o que aconteceu na primeira rodada do ciclo aqui. Faltar a
+ * variável tem que estourar com uma frase que diz o que fazer, não virar 429
+ * intermitente no meio da gravação.
+ */
 export function conexao() {
-  return new Connection(
-    process.env.SOLANA_RPC_URL ?? 'https://api.devnet.solana.com',
-    'confirmed',
-  );
+  const url = process.env.SOLANA_RPC_URL?.trim();
+
+  if (url && /mainnet/i.test(url)) {
+    throw new Error(
+      'SOLANA_RPC_URL aponta para mainnet. Este repositório é devnet, e só devnet.',
+    );
+  }
+
+  if (!url) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'SOLANA_RPC_URL não está no ambiente. Em produção o RPC dedicado é ' +
+          'obrigatório: o público de devnet estrangula por limite no meio da demonstração.',
+      );
+    }
+    return new Connection('https://api.devnet.solana.com', 'confirmed');
+  }
+
+  return new Connection(url, 'confirmed');
 }
 
 export function signatario(papel: Papel): Keypair {

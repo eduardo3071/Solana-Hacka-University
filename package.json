@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "conferir": "node scripts/conferir.mjs",
+    "seed": "node scripts/seed.mjs",
     "chaves": "node scripts/gerar-chaves.mjs",
     "saldo": "node scripts/saldo.mjs",
     "setup": "node scripts/cofre/setup.mjs",

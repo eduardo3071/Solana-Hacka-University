@@ -15,20 +15,11 @@ export const dynamic = 'force-dynamic';
  * devnet configurado no celular. O caminho de verdade é o QR: esta rota monta a
  * MESMA transferência que o QR pediria, e a conciliação não distingue as duas.
  *
- * Só devnet. `SOLANA_RPC_URL` apontando para mainnet derruba a rota antes de
- * qualquer coisa acontecer — este repositório não movimenta dinheiro de
- * verdade, e uma rota que gasta sozinha é o pior lugar para descobrir o
- * contrário.
+ * Só devnet — a guarda está em `conexao()`, que recusa mainnet em qualquer
+ * caminho do produto, e não só neste. Uma rota que gasta sozinha é o pior lugar
+ * para descobrir que a rede era outra, mas as demais também não são bons.
  */
 export async function POST(req: Request) {
-  const rpc = process.env.SOLANA_RPC_URL ?? '';
-  if (/mainnet/i.test(rpc)) {
-    return NextResponse.json(
-      { erro: 'Esta rota só existe em devnet.' },
-      { status: 403 },
-    );
-  }
-
   let referencia: unknown;
   try {
     ({ referencia } = await req.json());

@@ -257,24 +257,16 @@ export async function conciliar(referencia: string): Promise<SituacaoDaCompra> {
  * Um a menos no lote.
  *
  * `vendidos` é contador denormalizado porque a página da festa abre sem login e
- * o anônimo não pode ler `ingressos` — ver a migração 0004. Duas compras
- * simultâneas poderiam ler o mesmo valor e gravar o mesmo incremento, então o
- * total é recontado do banco na hora de escrever, e o `check (vendidos <=
- * total)` da tabela é a última linha de defesa.
+ * o anônimo não pode ler `ingressos` — ver a migração 0004. Soma um dentro do
+ * próprio UPDATE (`vender_lote`, migração 0007), e não reconta: o cartaz parte
+ * de um número que veio da gestão anterior, e recontar as linhas do banco novo
+ * apagaria as vendas de antes. Somar dentro do UPDATE também fecha a janela
+ * entre ler e gravar, que engolia uma de duas compras simultâneas.
  */
 async function debitarLote(loteId: string) {
-  const supabase = criarClienteServiceRole();
-
-  const { count } = await supabase
-    .from('ingressos')
-    .select('id', { count: 'exact', head: true })
-    .eq('lote_id', loteId)
-    .in('status', ['pago', 'usado']);
-
-  const { error } = await supabase
-    .from('lotes')
-    .update({ vendidos: count ?? 0 })
-    .eq('id', loteId);
+  const { error } = await criarClienteServiceRole().rpc('vender_lote', {
+    p_lote: loteId,
+  });
 
   // Contador errado não pode derrubar uma compra que já foi paga e já está no
   // livro-caixa. Fica no log para conferir depois.
