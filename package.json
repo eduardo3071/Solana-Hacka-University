@@ -10,10 +10,15 @@
     "typecheck": "tsc --noEmit",
     "conferir": "node scripts/conferir.mjs",
     "chaves": "node scripts/gerar-chaves.mjs",
-    "saldo": "node scripts/saldo.mjs"
+    "saldo": "node scripts/saldo.mjs",
+    "setup": "node scripts/cofre/setup.mjs",
+    "ciclo": "node scripts/cofre/ciclo.mjs",
+    "assinar": "node scripts/cofre/assinar.mjs",
+    "executar": "node scripts/cofre/executar.mjs"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",
+    "@sqds/multisig": "^2.1.4",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "bs58": "^6.0.0",
