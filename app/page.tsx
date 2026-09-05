@@ -13,6 +13,17 @@ export const metadata = { title: 'Quórum' };
  */
 const TELAS = [
   {
+    grupo: 'Ligado à devnet · funcional',
+    itens: [
+      {
+        id: '5b',
+        nome: 'Aprovações ao vivo',
+        href: `/e/${ENTIDADE.slug}/aprovacoes?estado=vivo`,
+        acesso: 'cofre real',
+      },
+    ],
+  },
+  {
     grupo: 'As cinco telas',
     itens: [
       { id: '5a', nome: 'Cofre', href: `/e/${ENTIDADE.slug}`, acesso: 'privada' },
@@ -89,8 +100,12 @@ export default function Indice() {
         <h1 className="t-hero mt-2 text-ink">Quórum</h1>
         <p className="t-desc mt-1.5 text-pretty text-ink-2">
           Cofre com {ENTIDADE.quorum.de} assinaturas de {ENTIDADE.quorum.entre} e
-          livro-caixa aberto aos associados. Dados de mentira, cenário
-          verdadeiro.
+          livro-caixa aberto aos associados.
+        </p>
+        <p className="t-meta mt-2 text-pretty text-ink-3">
+          A primeira tela fala com o cofre de verdade na devnet e os botões
+          funcionam. As demais são as pranchas com dados de mock — servem para
+          conferir o desenho, e nelas nada é clicável.
         </p>
       </header>
 
