@@ -35,11 +35,21 @@ if (!existsSync(ENV)) {
 
 let env = readFileSync(ENV, 'utf8');
 
+/**
+ * Um valor `<assim>` é o placeholder do .env.example, não uma chave. Quem
+ * clona o repositório copia o exemplo para .env.local, e sem esta checagem o
+ * gerador acha que já existem chaves e se recusa a rodar — justamente na
+ * primeira vez, que é quando ele mais precisa rodar.
+ */
+const ehPlaceholder = (v) => /^<.*>$/.test(v.trim());
+
 // Não sobrescreve chave já preenchida sem pedido explícito: regerar depois de
 // abastecer significa perder o SOL do faucet e esperar o limite liberar.
-const jaPreenchidas = SIGNATARIOS.filter((s) =>
-  new RegExp(`^${s.env}=.+$`, 'm').test(env),
-).map((s) => s.env);
+const jaPreenchidas = SIGNATARIOS.filter((s) => {
+  const m = env.match(new RegExp(`^${s.env}=(.*)$`, 'm'));
+  const valor = m?.[1]?.trim();
+  return Boolean(valor) && !ehPlaceholder(valor);
+}).map((s) => s.env);
 
 if (jaPreenchidas.length > 0 && !FORCAR) {
   console.error(`✗ Já existem chaves em ${ENV}: ${jaPreenchidas.join(', ')}`);

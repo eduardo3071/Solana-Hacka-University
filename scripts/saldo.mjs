@@ -21,7 +21,9 @@ function doEnv(chave) {
     .split('\n')
     .find((l) => l.startsWith(`${chave}=`));
   const valor = linha?.slice(chave.length + 1).trim();
-  return valor || undefined;
+  // `<assim>` é o placeholder do .env.example — vale como não preenchido.
+  if (!valor || /^<.*>$/.test(valor)) return undefined;
+  return valor;
 }
 
 const RPC = doEnv('SOLANA_RPC_URL') ?? 'https://api.devnet.solana.com';
