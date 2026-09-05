@@ -40,10 +40,20 @@ if (!resposta?.ok()) {
 const achados = await pagina.evaluate((largura) => {
   const problemas = [];
 
+  /**
+   * Quantas linhas o conteúdo ocupa de verdade.
+   *
+   * Contar retângulos não serve: um flex com dois filhos lado a lado produz
+   * dois retângulos na mesma linha. O que importa é quantos topos distintos
+   * existem — aí sim o texto desceu de linha.
+   */
   const linhasDe = (el) => {
     const r = document.createRange();
     r.selectNodeContents(el);
-    return r.getClientRects().length;
+    const topos = [...r.getClientRects()]
+      .filter((x) => x.width > 0 && x.height > 0)
+      .map((x) => Math.round(x.top));
+    return new Set(topos).size || 1;
   };
 
   // Nenhum texto se sobrepõe a outro.
@@ -65,15 +75,24 @@ const achados = await pagina.evaluate((largura) => {
     }
   }
 
+  // Contêiner de layout não é trecho de texto: seus filhos ficam lado a lado
+  // por definição, e medir quebra de linha nele não quer dizer nada.
+  const ehContainer = (el) => {
+    const d = getComputedStyle(el).display;
+    return d === 'flex' || d === 'grid' || d === 'inline-flex' || d === 'inline-grid';
+  };
+
   // Pílula, chip e etiqueta nunca quebram em duas linhas.
   for (const el of document.querySelectorAll('.t-chip')) {
-    if (linhasDe(el) > 1 && !el.innerHTML.includes('<br')) {
+    if (ehContainer(el) || el.innerHTML.includes('<br')) continue;
+    if (linhasDe(el) > 1) {
       problemas.push(`chip em duas linhas: "${el.textContent.trim().slice(0, 24)}"`);
     }
   }
 
   // Número e valor monetário nunca quebram.
   for (const el of document.querySelectorAll('.t-valor,.t-ancora,.t-ancora-sm,.num')) {
+    if (ehContainer(el)) continue;
     if (linhasDe(el) > 1) {
       problemas.push(`valor partido: "${el.textContent.trim().slice(0, 24)}"`);
     }

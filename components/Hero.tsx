@@ -68,13 +68,18 @@ export function Hero({
       className={`flex-none px-4 pt-3 pb-[18px] ${className}`}
       style={{ backgroundImage: `${TEXTURA},${GRADIENTE[variante]}` }}
     >
+      {/*
+        `num` e `t-chip` vão nos spans, nunca no contêiner: num flex com
+        justify-between o contêiner não é um trecho de texto, e o nowrap
+        aplicado nele confunde qualquer medição de quebra de linha.
+      */}
       {statusBar && (
         <div
-          className={`flex justify-between num t-chip ${escura ? 'text-[rgba(16,24,35,.72)]' : 'text-white/90'}`}
+          className={`flex justify-between ${escura ? 'text-[rgba(16,24,35,.72)]' : 'text-white/90'}`}
           aria-hidden
         >
-          <span>{statusBar.hora}</span>
-          <span>{statusBar.direita}</span>
+          <span className="num t-chip">{statusBar.hora}</span>
+          <span className="num t-chip">{statusBar.direita}</span>
         </div>
       )}
 

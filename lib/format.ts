@@ -23,6 +23,37 @@ const brlCompacto = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 0,
 });
 
+/*
+ * Versões sem o símbolo, para colunas onde "R$" repetido em toda linha só
+ * ocupa espaço — a lista de propostas, o livro-caixa.
+ *
+ * São formatadores próprios, não `.replace('R$ ', '')` na saída: o Intl separa
+ * o símbolo do número com espaço estreito inquebrável (U+202F), então o
+ * replace com espaço comum não casa e falha em silêncio, deixando o "R$" na
+ * tela.
+ */
+const numero = new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const numeroCompacto = new Intl.NumberFormat('pt-BR', {
+  maximumFractionDigits: 0,
+});
+
+export type OpcoesValor = {
+  /** Sem centavos: `R$ 43.180`. */
+  compacto?: boolean;
+  /** Sem o "R$". Padrão: com. */
+  simbolo?: boolean;
+};
+
+function valor(centavos: number, { compacto, simbolo = true }: OpcoesValor) {
+  const reais = centavos / 100;
+  if (simbolo) return compacto ? brlCompacto.format(reais) : brl.format(reais);
+  return compacto ? numeroCompacto.format(reais) : numero.format(reais);
+}
+
 /**
  * Valor completo, para livro-caixa e comprovante.
  *
@@ -31,8 +62,8 @@ const brlCompacto = new Intl.NumberFormat('pt-BR', {
  * O separador que o Intl põe entre `R$` e o número é espaço estreito
  * inquebrável (U+202F), então o valor nunca parte em duas linhas sozinho.
  */
-export function formatBRL(centavos: number): string {
-  return brl.format(centavos / 100);
+export function formatBRL(centavos: number, opcoes: OpcoesValor = {}): string {
+  return valor(centavos, opcoes);
 }
 
 /**
@@ -40,8 +71,11 @@ export function formatBRL(centavos: number): string {
  *
  * `4318025` → `"R$ 43.180"`
  */
-export function formatCompacto(centavos: number): string {
-  return brlCompacto.format(centavos / 100);
+export function formatCompacto(
+  centavos: number,
+  opcoes: Omit<OpcoesValor, 'compacto'> = {},
+): string {
+  return valor(centavos, { ...opcoes, compacto: true });
 }
 
 /**
@@ -56,13 +90,12 @@ export function formatCompacto(centavos: number): string {
 export function formatComSinal(
   centavos: number,
   tipo: TipoLancamento,
-  opcoes: { compacto?: boolean } = {},
+  opcoes: OpcoesValor = {},
 ): string {
   const sinal = tipo === 'entrada' ? '+' : MENOS;
-  const valor = opcoes.compacto
-    ? formatCompacto(Math.abs(centavos))
-    : formatBRL(Math.abs(centavos));
-  return `${sinal} ${valor}`;
+  // Espaço inquebrável entre sinal e valor: "− R$ 8.400" nunca parte
+  // depois do menos.
+  return `${sinal} ${valor(Math.abs(centavos), opcoes)}`;
 }
 
 const HORA = new Intl.DateTimeFormat('pt-BR', {

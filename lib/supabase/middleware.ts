@@ -10,6 +10,17 @@ type CookiesParaGravar = {
 }[];
 
 /**
+ * Enquanto os dados vêm de `lib/mock.ts` não existe login, e barrar as rotas
+ * privadas deixaria a demo inteira inacessível. O portão liga no B4, junto com
+ * o magic link: basta `NEXT_PUBLIC_AUTH_ATIVO=true`.
+ *
+ * O nome tem prefixo público porque é só um interruptor de build — não guarda
+ * segredo nenhum. A proteção de verdade dos dados é o RLS no banco, não este
+ * redirecionamento, que é conveniência de navegação.
+ */
+const AUTH_ATIVO = process.env.NEXT_PUBLIC_AUTH_ATIVO === 'true';
+
+/**
  * Rotas abertas a quem não tem conta. O livro-caixa público e a página da
  * festa são a tese do produto — elas não podem ficar atrás de login.
  */
@@ -36,6 +47,8 @@ function ehPublica(pathname: string): boolean {
  */
 export async function atualizarSessao(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  if (!AUTH_ATIVO) return response;
 
   const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {
     cookies: {
