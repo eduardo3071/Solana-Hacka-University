@@ -1,87 +1,231 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { BookOpen, CalendarDays, ChevronRight, Clock, Info } from 'lucide-react';
 
-import { usuarioAtual } from '@/lib/dados';
+import { Botao } from '@/components/Botao';
+import { Chip } from '@/components/Chip';
+import { Hero } from '@/components/Hero';
+import { IndicadorAssinaturas } from '@/components/IndicadorAssinaturas';
+import { CorpoTela, RotuloSecao, Tela } from '@/components/Tela';
+import { TileIcone } from '@/components/TileIcone';
+import { FormularioEntrada } from '@/app/entrar/FormularioEntrada';
+import { sair } from '@/lib/acoes';
+import { QUORUM, usuarioAtual, vitrinePublica } from '@/lib/dados';
+import { formatQuandoFesta } from '@/lib/format';
 import { criarClienteServidor } from '@/lib/supabase/server';
 
 export const metadata = { title: 'Quórum' };
+export const dynamic = 'force-dynamic';
 
 /**
- * Capa.
+ * A capa — a porta de entrada, prancha 5f.
  *
- * Quem já entrou vai direto para o cofre da própria entidade. Quem não entrou
- * vê a porta e os dois lugares que abrem sem conta — que são a tese do produto.
+ * Três destinos, decididos aqui e não pelo visitante:
+ *   quem já entrou e tem entidade  → vai direto ao cofre, sem parada
+ *   quem entrou e não tem entidade → convite pendente, não erro
+ *   quem não entrou                → a porta
+ *
+ * A tela do visitante tem uma ordem que não é acidental: primeiro o que o
+ * produto É, depois a regra que o sustenta, depois a porta de quem trabalha
+ * nele, e por último — mas visíveis, não em rodapé — as duas páginas que abrem
+ * sem conta nenhuma. São elas a prova do discurso, e é nelas que alguém clica
+ * antes de acreditar em qualquer frase.
  */
 export default async function Capa() {
   const sessao = await usuarioAtual();
 
-  let slug: string | null = null;
-  if (sessao?.entidadeId) {
+  if (sessao?.user && sessao.entidadeId) {
     const supabase = await criarClienteServidor();
     const { data } = await supabase
       .from('entidades')
       .select('slug')
       .eq('id', sessao.entidadeId)
       .maybeSingle();
-    slug = data?.slug ?? null;
+    if (data?.slug) redirect(`/e/${data.slug}`);
   }
 
+  if (sessao?.user) return <SemEntidade email={sessao.user.email ?? ''} />;
+
+  return <Visitante />;
+}
+
+/* ── Visitante ──────────────────────────────────────────────────────────── */
+
+async function Visitante() {
+  const { entidade, evento } = await vitrinePublica();
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[390px] flex-col justify-center gap-6 px-4 py-10">
-      <header>
-        <p className="t-rotulo text-ink-3">Tesouraria estudantil</p>
-        <h1 className="t-hero mt-2 text-ink">Quórum</h1>
-        <p className="t-desc mt-1.5 text-pretty text-ink-2">
-          O dinheiro da entidade fica num cofre que exige duas assinaturas de
-          três para qualquer saída, e o livro-caixa é aberto aos associados.
-        </p>
-      </header>
+    <Tela>
+      <Hero
+        rotulo="Tesouraria estudantil"
+        titulo="Quórum"
+        subtitulo="O caixa da sua entidade num cofre coletivo, com livro-caixa aberto aos associados."
+        pilula="Visitante"
+      />
 
-      <nav className="flex flex-col gap-2">
-        {slug ? (
-          <>
-            <Item href={`/e/${slug}`} titulo="Ir para o cofre" nota="sua entidade" />
-            <Item
-              href={`/e/${slug}/aprovacoes`}
-              titulo="Aprovações"
-              nota="assinar saídas"
-            />
-          </>
-        ) : (
-          <Item href="/entrar" titulo="Entrar" nota="link por e-mail" />
-        )}
-      </nav>
+      <CorpoTela className="pt-3.5 pb-4">
+        {/* A regra que sustenta o produto inteiro, mostrada e não só dita. */}
+        <section className="rounded-card border border-line bg-surface p-4">
+          <h2 className="t-secao text-ink">Duas assinaturas de três</h2>
+          <p className="t-desc mt-2 text-pretty text-ink-2">
+            Nenhum membro da diretoria move o dinheiro sozinho. Toda saída
+            precisa da assinatura de dois dos três signatários.
+          </p>
 
-      <section>
-        <h2 className="t-rotulo mb-2.5 text-ink-3">Aberto, sem conta</h2>
-        <div className="flex flex-col gap-2">
-          <Item
-            href={`/e/${slug ?? 'aaaeng'}/livro`}
-            titulo="Livro-caixa público"
-            nota="sem login"
+          <div className="my-3.5 h-px bg-line" />
+
+          {/*
+            Ilustração da regra, não registro de uma saída que aconteceu: por
+            isso a legenda fala do quórum e não de quem assinou. Inventar
+            assinatura de gente real numa capa seria mentir para quem avalia.
+          */}
+          <IndicadorAssinaturas
+            assinaturas={[{ nome: 'Letícia Marchetti' }, { nome: 'Marina Salgado' }]}
+            necessarias={QUORUM.de}
+            total={QUORUM.entre}
+            titulo={`${QUORUM.de} de ${QUORUM.entre} · quórum atingido`}
+            legenda="Com duas assinaturas, a saída é executada na hora"
+            barra={false}
           />
-          <Item href="/estilo" titulo="Folha de estilo" nota="referência" />
-        </div>
-      </section>
-    </main>
+        </section>
+
+        <section className="rounded-card border border-line bg-surface p-4">
+          <RotuloSecao>Acesso da diretoria</RotuloSecao>
+          <FormularioEntrada rotuloOculto />
+        </section>
+
+        <RotuloSecao>Abertas sem conta</RotuloSecao>
+
+        {entidade && (
+          <Porta
+            href={`/e/${entidade.slug}/livro`}
+            icone={BookOpen}
+            titulo="Livro-caixa"
+            detalhe={`Toda entrada e saída · ${entidade.nome}`}
+            chip="aberto"
+          />
+        )}
+
+        {evento && (
+          <Porta
+            href={`/f/${evento.slug}`}
+            icone={CalendarDays}
+            titulo={evento.nome}
+            detalhe={`${formatQuandoFesta(evento.data)}${evento.local ? ` · ${evento.local}` : ''}`}
+          />
+        )}
+
+        <p className="mt-auto pt-2 text-center text-[11.5px] leading-none text-ink-3">
+          Quórum v0.1
+        </p>
+      </CorpoTela>
+    </Tela>
   );
 }
 
-function Item({
+function Porta({
   href,
+  icone,
   titulo,
-  nota,
+  detalhe,
+  chip,
 }: {
   href: string;
+  icone: typeof BookOpen;
   titulo: string;
-  nota: string;
+  detalhe: string;
+  chip?: string;
 }) {
   return (
-    <Link
+    <a
       href={href}
-      className="flex min-h-[52px] items-center gap-3 rounded-[14px] border border-line bg-surface px-[13px] py-3"
+      className="flex min-h-[68px] items-center gap-[13px] rounded-card border border-line bg-surface px-3.5 py-3"
     >
-      <span className="t-item-sm min-w-0 flex-1 truncate text-ink">{titulo}</span>
-      <span className="t-chip flex-none text-ink-3">{nota}</span>
-    </Link>
+      <TileIcone icone={icone} acento="blue" tamanho="lg" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="t-item truncate text-ink">{titulo}</span>
+          {chip && (
+            <span className="flex-none">
+              <Chip acento="green">{chip}</Chip>
+            </span>
+          )}
+        </div>
+        <div className="mt-[5px] truncate text-[12.5px] leading-[1.3] text-ink-2">
+          {detalhe}
+        </div>
+      </div>
+      <ChevronRight size={18} strokeWidth={1.8} className="flex-none text-blue" aria-hidden />
+    </a>
+  );
+}
+
+/* ── Entrou, mas ninguém o cadastrou ────────────────────────────────────── */
+
+/**
+ * Convite pendente, não erro.
+ *
+ * Por isso o hero é âmbar — a cor da espera — e não vermelho. A pessoa fez
+ * tudo certo: entrou com um e-mail que a diretoria ainda não cadastrou. O
+ * vermelho está reservado para bloqueio, recusa e erro, e nada aqui é isso.
+ */
+async function SemEntidade({ email }: { email: string }) {
+  const { entidade } = await vitrinePublica();
+
+  return (
+    <Tela>
+      <Hero
+        variante="amber"
+        rotulo="Quórum"
+        titulo="Você entrou, mas ainda não tem entidade"
+        subtitulo={email}
+        pilula="Aguardando"
+      />
+
+      <CorpoTela className="pt-3.5 pb-4">
+        <section className="flex items-start gap-3 rounded-card border border-line bg-surface p-4">
+          <TileIcone icone={Clock} acento="amber" tamanho="lg" />
+          <div className="min-w-0">
+            <h2 className="t-item text-ink">Falta a diretoria te cadastrar</h2>
+            <p className="t-desc mt-1.5 text-pretty text-ink-2">
+              Seu e-mail está reconhecido, mas nenhuma entidade adicionou você
+              como signatário ou associado. Assim que a diretoria cadastrar, o
+              cofre aparece aqui.
+            </p>
+          </div>
+        </section>
+
+        {entidade && (
+          <>
+            <RotuloSecao>Enquanto isso</RotuloSecao>
+            <Porta
+              href={`/e/${entidade.slug}/livro`}
+              icone={BookOpen}
+              titulo="Ver um livro-caixa público"
+              detalhe={entidade.nome}
+            />
+          </>
+        )}
+
+        <section className="flex items-start gap-3 rounded-card border border-line bg-surface p-4">
+          <TileIcone icone={Info} acento="blue" tamanho="lg" />
+          <div className="min-w-0">
+            <h2 className="t-item-sm text-ink">Já pediu para entrar?</h2>
+            <p className="t-desc mt-1.5 text-pretty text-ink-2">
+              Peça à diretoria para te cadastrar com este mesmo e-mail.
+            </p>
+          </div>
+        </section>
+
+        <form action={sair} className="mt-auto pt-2">
+          <Botao type="submit" variante="secundario">
+            Sair desta conta
+          </Botao>
+        </form>
+
+        <p className="text-center text-[11.5px] leading-none text-ink-3">
+          Quórum v0.1
+        </p>
+      </CorpoTela>
+    </Tela>
   );
 }

@@ -278,6 +278,48 @@ export const eventoPorSlug = cache(async (slug: string) => {
   return data;
 });
 
+/**
+ * O que a capa mostra a quem chega sem conta.
+ *
+ * Uma entidade pública e a próxima festa dela — as duas portas que abrem sem
+ * login, e que são a tese do produto. Lê com o cliente anônimo de propósito: se
+ * a política não deixasse passar, a capa mostraria menos, nunca mais.
+ */
+export const vitrinePublica = cache(async () => {
+  const supabase = await criarClienteServidor();
+
+  const { data: entidade } = await supabase
+    .from('entidades')
+    .select('nome, slug')
+    .eq('publico', true)
+    .order('criado_em')
+    .limit(1)
+    .maybeSingle();
+
+  if (!entidade) return { entidade: null, evento: null };
+
+  // A próxima que ainda não aconteceu; se todas já passaram, a mais recente —
+  // um cartaz vazio na capa é pior que um cartaz de festa que já rolou.
+  const { data: futura } = await supabase
+    .from('eventos')
+    .select('nome, slug, data, local')
+    .gte('data', new Date().toISOString())
+    .order('data')
+    .limit(1)
+    .maybeSingle();
+
+  const { data: ultima } = futura
+    ? { data: null }
+    : await supabase
+        .from('eventos')
+        .select('nome, slug, data, local')
+        .order('data', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+  return { entidade, evento: futura ?? ultima };
+});
+
 export type Lote = {
   id: string;
   nome: string;

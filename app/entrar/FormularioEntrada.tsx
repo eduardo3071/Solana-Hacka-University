@@ -7,7 +7,18 @@ import { Botao } from '@/components/Botao';
 import { TileIcone } from '@/components/TileIcone';
 import { enviarLink, type EstadoEntrada } from '@/lib/acoes';
 
-export function FormularioEntrada({ aviso }: { aviso?: string }) {
+export function FormularioEntrada({
+  aviso,
+  rotuloOculto = false,
+}: {
+  aviso?: string;
+  /**
+   * Na capa o campo mora dentro de um cartão que já diz "acesso da diretoria",
+   * e um segundo rótulo acima dele seria repetição. O `<label>` continua no
+   * HTML — só sai da vista. Campo sem nome é campo mudo para leitor de tela.
+   */
+  rotuloOculto?: boolean;
+}) {
   const [estado, acao, pendente] = useActionState<EstadoEntrada, FormData>(
     enviarLink,
     {},
@@ -31,7 +42,12 @@ export function FormularioEntrada({ aviso }: { aviso?: string }) {
   return (
     <form action={acao} className="flex flex-col gap-3">
       <div>
-        <label htmlFor="email" className="t-rotulo mb-2 block text-ink-2">
+        <label
+          htmlFor="email"
+          className={
+            rotuloOculto ? 'sr-only' : 't-rotulo mb-2 block text-ink-2'
+          }
+        >
           Seu e-mail
         </label>
         <input

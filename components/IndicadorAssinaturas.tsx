@@ -30,28 +30,50 @@ export function IndicadorAssinaturas({
   assinaturas,
   necessarias,
   legenda,
+  total,
+  titulo: tituloDado,
+  barra = true,
 }: {
   assinaturas: Assinatura[];
   necessarias: number;
   /** Sobrescreve a linha de baixo. Sem isso, é derivada de quem assinou. */
   legenda?: React.ReactNode;
+  /**
+   * Quantos avatares desenhar. Por padrão, um por assinatura necessária — que é
+   * como as pranchas 5b e 6c mostram.
+   *
+   * A capa usa `total = 3` para desenhar os três signatários do cofre com duas
+   * assinaturas dadas: lá o que se explica é a regra ("duas de três"), e não o
+   * andamento de uma proposta.
+   */
+  total?: number;
+  /** Sobrescreve a contagem em negrito. */
+  titulo?: string;
+  /**
+   * A barra de progresso. Some na capa: lá o indicador ilustra a regra, e não
+   * o andamento de uma proposta — uma barra cheia sugeriria que algo terminou.
+   */
+  barra?: boolean;
 }) {
   const feitas = Math.min(assinaturas.length, necessarias);
   const completo = feitas >= necessarias;
   const nenhuma = feitas === 0;
+  const casas = total ?? necessarias;
 
   const acento: Acento = completo ? 'green' : 'amber';
   const corDoTitulo = nenhuma ? 'text-ink-2' : TEXTO_ACENTO[acento];
 
-  const titulo = completo
-    ? `Quórum completo · ${feitas} de ${necessarias}`
-    : `${feitas} de ${necessarias} assinaturas`;
+  const titulo =
+    tituloDado ??
+    (completo
+      ? `Quórum completo · ${feitas} de ${necessarias}`
+      : `${feitas} de ${necessarias} assinaturas`);
 
   return (
     <div>
       <div className="flex items-center gap-3">
         <div className="flex flex-none gap-[7px]">
-          {Array.from({ length: necessarias }, (_, i) => {
+          {Array.from({ length: casas }, (_, i) => {
             const assinatura = assinaturas[i];
             return assinatura ? (
               <div
@@ -88,12 +110,14 @@ export function IndicadorAssinaturas({
         </div>
       </div>
 
-      <BarraProgresso
-        className="mt-[13px]"
-        valor={(feitas / necessarias) * 100}
-        acento={acento}
-        neutro={nenhuma}
-      />
+      {barra && (
+        <BarraProgresso
+          className="mt-[13px]"
+          valor={(feitas / necessarias) * 100}
+          acento={acento}
+          neutro={nenhuma}
+        />
+      )}
     </div>
   );
 }
