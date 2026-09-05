@@ -11,6 +11,7 @@ import { Hero } from '@/components/Hero';
 import { IndicadorAssinaturas } from '@/components/IndicadorAssinaturas';
 import { LinhaDetalhe, ListaDetalhes } from '@/components/LinhaDetalhe';
 import { CorpoTela, RotuloSecao, Tela } from '@/components/Tela';
+import { PainelCofre } from '@/components/vivo/PainelCofre';
 import { TileIcone } from '@/components/TileIcone';
 import {
   AGORA,
@@ -49,6 +50,9 @@ export default async function Aprovacoes({
   switch (estado) {
     case undefined:
       return <ListaDeAprovacoes slug={slug} />;
+    // O mesmo desenho, ligado ao cofre de verdade na devnet.
+    case 'vivo':
+      return <AprovacoesAoVivo slug={slug} />;
     case 'recusada':
       return <PropostaRecusada slug={slug} />;
     case 'executando':
@@ -161,6 +165,30 @@ function ListaDeAprovacoes({ slug }: { slug: string }) {
           Enquanto o quórum não fecha, o valor permanece no cofre. Nenhuma
           cobrança é feita e nada é enviado ao banco.
         </p>
+      </CorpoTela>
+
+      <BarraAbas ativa="aprovar" slug={slug} pendencias={PENDENTES.length} />
+    </Tela>
+  );
+}
+
+/* ── 5b ao vivo · o bloqueio vindo da rede ──────────────────────────────── */
+
+function AprovacoesAoVivo({ slug }: { slug: string }) {
+  return (
+    <Tela>
+      <Hero
+        variante="red"
+        statusBar={{ hora: '21:34', direita: 'Wi-Fi · 82%' }}
+        rotulo={ENTIDADE.nome}
+        titulo="Aprovações"
+        subtitulo="Cofre 2 de 3 na devnet"
+        pilula="ao vivo"
+      />
+
+      <CorpoTela respiroAbas>
+        <RotuloSecao>Aguardando a segunda assinatura</RotuloSecao>
+        <PainelCofre />
       </CorpoTela>
 
       <BarraAbas ativa="aprovar" slug={slug} pendencias={PENDENTES.length} />
