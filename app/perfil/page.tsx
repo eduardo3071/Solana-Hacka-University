@@ -1,46 +1,89 @@
-import {
-  Building2,
-  Check,
-  ChevronRight,
-  Lock,
-  LogOut,
-  Plus,
-  User,
-} from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { Building2, Check, ChevronRight, LogOut, User } from 'lucide-react';
 
 import { BarraAbas } from '@/components/BarraAbas';
-import { BarraProgresso } from '@/components/BarraProgresso';
 import { Botao } from '@/components/Botao';
+import { Erro, Vazio } from '@/components/Estados';
 import { Hero } from '@/components/Hero';
-import { CorpoTela, RotuloSecao, Tela } from '@/components/Tela';
+import { CorpoTela, Tela } from '@/components/Tela';
 import { TileIcone } from '@/components/TileIcone';
-import { ENTIDADE, PENDENTES, USUARIA, nomeDoPapel } from '@/lib/mock';
+import { sair } from '@/lib/acoes';
+import {
+  QUORUM,
+  entidadePorSlug,
+  nomeDoPapel,
+  pendentes,
+  signatarios,
+  totais,
+  usuarioAtual,
+} from '@/lib/dados';
 import { formatCompacto } from '@/lib/format';
+import { criarClienteServidor } from '@/lib/supabase/server';
 
 export const metadata = { title: 'Perfil · Quórum' };
 
-/**
- * 5e · Perfil e carteirinha na mesma tela — e 6f, a troca de diretoria.
- *
- * O cartão de perfil fica ABAIXO do hero, não por trás dele: a sobreposição
- * cortava o nome atrás da faixa azul, que foi o erro mais visível da auditoria.
- */
-export default async function Perfil({
-  searchParams,
-}: {
-  searchParams: Promise<{ estado?: string }>;
-}) {
-  const { estado } = await searchParams;
-  if (estado === 'troca') return <TrocaDeDiretoria />;
+/** 5e · Perfil e carteirinha, com os dados de quem está logado. */
+export default async function Perfil() {
+  const sessao = await usuarioAtual();
+  if (!sessao?.user) redirect('/entrar?proxima=/perfil');
 
-  const eu = USUARIA();
+  const eu = sessao.membro;
+
+  // Sessão válida sem membro: entrou com um e-mail que a diretoria não
+  // cadastrou. Não é erro — é convite pendente.
+  if (!eu || !sessao.entidadeId) {
+    return (
+      <Tela>
+        <Hero titulo="Perfil" />
+        <CorpoTela respiroAbas className="pt-3">
+          <Vazio titulo="Você ainda não está em nenhuma entidade">
+            Entrou como <strong>{sessao.user.email}</strong>, mas esse e-mail não
+            consta na diretoria de nenhuma atlética. Peça para quem administra
+            cadastrar você.
+          </Vazio>
+          <form action={sair}>
+            <Botao type="submit" variante="secundario">
+              Sair
+            </Botao>
+          </form>
+        </CorpoTela>
+        <BarraAbas ativa="perfil" slug="" />
+      </Tela>
+    );
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data: ent } = await supabase
+    .from('entidades')
+    .select('slug')
+    .eq('id', sessao.entidadeId)
+    .maybeSingle();
+  const slug = ent?.slug ?? '';
+
+  let entidade, soma, emAberto, diretoria;
+  try {
+    [entidade, soma, emAberto, diretoria] = await Promise.all([
+      entidadePorSlug(slug),
+      totais(sessao.entidadeId),
+      pendentes(sessao.entidadeId),
+      signatarios(sessao.entidadeId),
+    ]);
+  } catch (e) {
+    console.error('[perfil] falha ao ler', e);
+    return (
+      <Tela>
+        <Hero titulo="Perfil" />
+        <CorpoTela respiroAbas>
+          <Erro>Seus dados não carregaram. Tente recarregar em instantes.</Erro>
+        </CorpoTela>
+        <BarraAbas ativa="perfil" slug={slug} />
+      </Tela>
+    );
+  }
 
   return (
     <Tela>
-      <Hero
-        statusBar={{ hora: '21:34', direita: 'Wi-Fi · 82%' }}
-        titulo="Perfil"
-      />
+      <Hero titulo="Perfil" />
 
       <CorpoTela respiroAbas className="pt-3">
         <section className="flex-none rounded-card border border-line bg-surface">
@@ -51,27 +94,25 @@ export default async function Perfil({
             <div className="min-w-0 flex-1">
               <h2 className="t-secao text-ink">{eu.nome}</h2>
               <div className="mt-[5px] truncate text-[12px] leading-[1.3] text-ink-3">
-                {eu.email}
+                {eu.email ?? sessao.user.email}
               </div>
               <div className="mt-2 flex gap-[7px]">
                 <span className="t-chip rounded-chip bg-blue-tint px-[7px] py-[5px] text-blue">
                   {nomeDoPapel[eu.papel]}
                 </span>
-                <span className="t-chip rounded-chip bg-green-tint px-[7px] py-[5px] text-green">
-                  Assinante
-                </span>
+                {eu.papel !== 'socio' && (
+                  <span className="t-chip rounded-chip bg-green-tint px-[7px] py-[5px] text-green">
+                    Assinante
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-3 border-t border-line">
-            <Numero
-              valor={formatCompacto(ENTIDADE.saldoCentavos)}
-              rotulo="Sob sua guarda"
-              borda
-            />
-            <Numero valor="128" rotulo="Assinaturas" borda />
-            <Numero valor="Mar 2026" rotulo="Na diretoria desde" />
+            <Numero valor={formatCompacto(soma.saldo)} rotulo="Sob sua guarda" borda />
+            <Numero valor={String(emAberto.length)} rotulo="Aguardando" borda />
+            <Numero valor={`${QUORUM.de} de ${QUORUM.entre}`} rotulo="Quórum do cofre" />
           </div>
         </section>
 
@@ -87,7 +128,7 @@ export default async function Perfil({
         >
           <div className="flex items-start justify-between gap-3">
             <span className="t-rotulo whitespace-nowrap text-white/80">
-              {ENTIDADE.nome} · {ENTIDADE.universidade}
+              {entidade?.nome} · {entidade?.universidade}
             </span>
             <span className="t-chip flex-none rounded-chip border border-white/30 bg-ground/32 px-2 py-[5px] text-white">
               Sócia
@@ -98,185 +139,51 @@ export default async function Perfil({
             {eu.nome}
           </div>
           <div className="mt-[5px] text-[12.5px] leading-[1.4] font-medium text-white/88">
-            {nomeDoPapel[eu.papel]} · diretoria {ENTIDADE.diretoria}
-          </div>
-
-          <div className="mt-4 flex gap-[22px]">
-            <CampoCarteirinha rotulo="Sócio nº" valor="0142" />
-            <CampoCarteirinha rotulo="Validade" valor="31/12/2026" />
+            {nomeDoPapel[eu.papel]}
           </div>
 
           <div className="mt-3.5 rounded-tile-sm bg-ground/34 px-[11px] py-[9px] font-mono text-[11px] leading-none tracking-[0.02em] text-white/92">
-            ref 4c71-90ab-22e5-0142
+            ref {eu.id.slice(0, 18)}
           </div>
         </section>
 
         <div className="flex flex-none flex-col gap-[9px]">
           <LinhaPerfil
-            icone={User}
-            acento="blue"
-            titulo="Dados pessoais"
-            detalhe="Nome, curso, matrícula"
-          />
-          <LinhaPerfil
             icone={Building2}
             acento="purple"
             titulo="Entidade"
-            detalhe={`${ENTIDADE.nome} · ${ENTIDADE.universidade}`}
+            detalhe={`${entidade?.nome} · ${diretoria.length} signatários`}
           />
           <LinhaPerfil
             icone={Check}
             acento="green"
             titulo="Assinatura digital"
-            detalhe="Chave e dispositivo"
+            detalhe={eu.papel === 'socio' ? 'Sócio não assina' : 'Ativa neste dispositivo'}
           />
           <LinhaPerfil
-            icone={LogOut}
-            acento="amber"
-            titulo="Troca de diretoria"
-            detalhe="Gestão 2026 → 2027"
-            href="/perfil?estado=troca"
+            icone={User}
+            acento="blue"
+            titulo="Dados pessoais"
+            detalhe={eu.email ?? sessao.user.email ?? ''}
           />
         </div>
+
+        <form action={sair} className="flex-none">
+          <Botao type="submit" variante="secundario">
+            <LogOut size={16} strokeWidth={1.8} aria-hidden />
+            Sair
+          </Botao>
+        </form>
 
         <p className="my-0.5 text-center text-[11.5px] leading-none text-ink-3">
           Quórum v0.1
         </p>
       </CorpoTela>
 
-      <BarraAbas ativa="perfil" slug={ENTIDADE.slug} pendencias={PENDENTES.length} />
+      <BarraAbas ativa="perfil" slug={slug} pendencias={emAberto.length} />
     </Tela>
   );
 }
-
-/* ── 6f · troca de diretoria ────────────────────────────────────────────── */
-
-function TrocaDeDiretoria() {
-  return (
-    <Tela>
-      <Hero
-        variante="purple"
-        statusBar={{ hora: '10:04', direita: 'Wi-Fi · 78%' }}
-        rotulo={ENTIDADE.nome}
-        titulo="Troca de diretoria"
-        subtitulo={
-          <>
-            Gestão 2026 → Gestão 2027
-            <br />
-            Vigência 01 jan 2027
-          </>
-        }
-        pilula="1 de 2"
-      />
-
-      <CorpoTela respiroAbas className="gap-2 pt-3">
-        <RotuloSecao>Saem do cofre · 31 dez 2026</RotuloSecao>
-
-        <div className="flex items-center gap-[11px] rounded-[14px] border border-line bg-surface px-[13px] py-[11px] opacity-55">
-          <div className="flex flex-none gap-1.5">
-            <AvatarNeutro>LM</AvatarNeutro>
-            <AvatarNeutro>MS</AvatarNeutro>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="t-item-sm text-ink line-through">
-              Letícia e Marina
-            </div>
-            <div className="mt-[5px] text-[11.5px] leading-[1.3] whitespace-nowrap text-ink-2">
-              Presidente e tesoureira
-            </div>
-          </div>
-          <LogOut size={16} strokeWidth={1.7} className="flex-none text-ink-2" aria-hidden />
-        </div>
-
-        <RotuloSecao>Entram no cofre · 01 jan 2027</RotuloSecao>
-
-        <div className="flex items-center gap-[11px] rounded-[14px] border-[1.5px] border-blue bg-blue-tint px-[13px] py-[11px]">
-          <div className="flex size-[34px] flex-none items-center justify-center rounded-tile-sm bg-[#0E2A42] text-[12.5px] leading-none font-bold text-blue">
-            CB
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="t-item-sm text-ink">Caio Bertoldi</div>
-            <div className="mt-[5px] text-[11.5px] leading-[1.3] text-blue-ink">
-              Presidente · aceitou em 28 nov
-            </div>
-          </div>
-          <Check size={16} strokeWidth={2} className="flex-none text-green" aria-hidden />
-        </div>
-
-        <div className="flex items-center gap-[11px] rounded-[14px] border border-line bg-surface px-[13px] py-[11px]">
-          <div className="flex size-[34px] flex-none items-center justify-center rounded-tile-sm border-[1.5px] border-dashed border-dash text-[12px] leading-none font-bold text-ink-3">
-            JP
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
-            <div className="t-item-sm text-ink">Júlia Prazeres</div>
-            <div className="text-[11.5px] leading-[16px] text-amber">
-              Tesoureira · convite há 2 dias
-            </div>
-          </div>
-          <span className="t-chip flex-none rounded-chip bg-amber-tint px-[7px] py-[5px] text-amber">
-            Aguardando
-          </span>
-        </div>
-
-        <div className="flex items-center gap-[11px] rounded-[14px] border border-line bg-surface px-[13px] py-[11px]">
-          <div className="flex size-[34px] flex-none items-center justify-center rounded-tile-sm bg-green-tint text-[12.5px] leading-none font-bold text-green">
-            RT
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="t-item-sm text-ink">Rafael Tonetto</div>
-            <div className="mt-[5px] text-[11.5px] leading-[1.3] text-ink-2">
-              Conselho fiscal · permanece
-            </div>
-          </div>
-          <span className="t-chip flex-none rounded-chip bg-green-tint px-[7px] py-[5px] text-green">
-            Mantido
-          </span>
-        </div>
-
-        <div className="mt-1.5 rounded-card border border-line bg-surface p-3.5">
-          <div className="flex items-start gap-[11px]">
-            <TileIcone icone={Lock} acento="blue" tamanho="md" />
-            <div className="min-w-0 flex-1">
-              <div className="t-item-sm text-ink">
-                A troca exige {ENTIDADE.quorum.de} de {ENTIDADE.quorum.entre} da
-                gestão atual
-              </div>
-              <div className="t-meta mt-[5px] text-ink-2">
-                O histórico não muda
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
-            <div className="flex flex-none gap-[7px]">
-              <div className="flex size-9 items-center justify-center rounded-avatar bg-green-tint text-[12.5px] leading-none font-bold text-green">
-                RT
-              </div>
-              <div className="flex size-9 items-center justify-center rounded-avatar border-[1.5px] border-dashed border-dash">
-                <Plus size={16} strokeWidth={1.7} className="text-ink-3" aria-hidden />
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="num text-[13px] leading-[1.2] font-bold text-amber">
-                1 de 2 assinaturas
-              </div>
-              <div className="mt-[5px] text-[12px] leading-[1.3] text-ink-2">
-                Rafael assinou · falta você
-              </div>
-            </div>
-          </div>
-
-          <BarraProgresso className="mt-3" valor={50} acento="amber" />
-          <Botao className="mt-[13px]">Assinar a troca</Botao>
-        </div>
-      </CorpoTela>
-
-      <BarraAbas ativa="perfil" slug={ENTIDADE.slug} pendencias={PENDENTES.length} />
-    </Tela>
-  );
-}
-
-/* ── peças ──────────────────────────────────────────────────────────────── */
 
 function Numero({
   valor,
@@ -292,28 +199,7 @@ function Numero({
       <div className="num text-[15px] leading-none font-extrabold tracking-[-0.03em] text-ink">
         {valor}
       </div>
-      <div className="mt-1.5 text-[10.5px] leading-[1.3] text-ink-3">
-        {rotulo}
-      </div>
-    </div>
-  );
-}
-
-function CampoCarteirinha({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div>
-      <div className="t-rotulo whitespace-nowrap text-white/72">{rotulo}</div>
-      <div className="num mt-1.5 text-[13px] leading-none font-bold text-white">
-        {valor}
-      </div>
-    </div>
-  );
-}
-
-function AvatarNeutro({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex size-[34px] items-center justify-center rounded-tile-sm bg-line text-[12.5px] leading-none font-bold text-ink-2">
-      {children}
+      <div className="mt-1.5 text-[10.5px] leading-[1.3] text-ink-3">{rotulo}</div>
     </div>
   );
 }
@@ -323,16 +209,14 @@ function LinhaPerfil({
   acento,
   titulo,
   detalhe,
-  href,
 }: {
   icone: typeof User;
-  acento: 'blue' | 'green' | 'amber' | 'purple';
+  acento: 'blue' | 'green' | 'purple';
   titulo: string;
   detalhe: string;
-  href?: string;
 }) {
-  const conteudo = (
-    <>
+  return (
+    <div className="flex min-h-[58px] items-center gap-[11px] rounded-[14px] border border-line bg-surface px-[13px] py-[11px]">
       <TileIcone icone={icone} acento={acento} tamanho="md" />
       <div className="min-w-0 flex-1">
         <div className="t-item-sm text-ink">{titulo}</div>
@@ -341,17 +225,6 @@ function LinhaPerfil({
         </div>
       </div>
       <ChevronRight size={16} strokeWidth={1.7} className="flex-none text-ink-3" aria-hidden />
-    </>
-  );
-
-  const classe =
-    'flex min-h-[58px] items-center gap-[11px] rounded-[14px] border border-line bg-surface px-[13px] py-[11px]';
-
-  return href ? (
-    <a href={href} className={classe}>
-      {conteudo}
-    </a>
-  ) : (
-    <div className={classe}>{conteudo}</div>
+    </div>
   );
 }

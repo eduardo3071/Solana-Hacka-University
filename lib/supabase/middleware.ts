@@ -10,24 +10,24 @@ type CookiesParaGravar = {
 }[];
 
 /**
- * Enquanto os dados vêm de `lib/mock.ts` não existe login, e barrar as rotas
- * privadas deixaria a demo inteira inacessível. O portão liga no B4, junto com
- * o magic link: basta `NEXT_PUBLIC_AUTH_ATIVO=true`.
+ * O portão de autenticação, ligado desde o B4.
  *
- * O nome tem prefixo público porque é só um interruptor de build — não guarda
- * segredo nenhum. A proteção de verdade dos dados é o RLS no banco, não este
- * redirecionamento, que é conveniência de navegação.
+ * `NEXT_PUBLIC_AUTH_ATIVO=false` desliga, o que só serve para conferir as
+ * pranchas sem sessão. Não é medida de segurança: quem protege os dados é o
+ * RLS no banco. Este redirecionamento é conveniência de navegação — sem ele o
+ * visitante veria telas vazias em vez de ser mandado para o login.
  */
-const AUTH_ATIVO = process.env.NEXT_PUBLIC_AUTH_ATIVO === 'true';
+const AUTH_ATIVO = process.env.NEXT_PUBLIC_AUTH_ATIVO !== 'false';
 
 /**
  * Rotas abertas a quem não tem conta. O livro-caixa público e a página da
  * festa são a tese do produto — elas não podem ficar atrás de login.
  */
 const ROTAS_PUBLICAS = [
-  '/', // capa
+  '/', // índice da demo
   '/estilo', // folha de estilo viva
   '/entrar', // magic link
+  '/auth/confirmar', // volta do link do e-mail
 ];
 
 function ehPublica(pathname: string): boolean {

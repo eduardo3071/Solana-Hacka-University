@@ -1,40 +1,87 @@
+import { notFound } from 'next/navigation';
 import { ArrowDown, ArrowUp, Search, SlidersHorizontal } from 'lucide-react';
 
 import { Chip } from '@/components/Chip';
 import { COR_DA_RUBRICA } from '@/components/acentos';
+import { Erro, LivroVazio } from '@/components/Estados';
 import { Hero } from '@/components/Hero';
 import { CorpoTela, Tela } from '@/components/Tela';
 import { TileIcone } from '@/components/TileIcone';
 import {
-  ENTIDADE,
-  LANCAMENTOS,
-  TOTAL_ENTROU,
-  TOTAL_SAIU,
-} from '@/lib/mock';
+  QUORUM,
+  associados,
+  entidadePorSlug,
+  lancamentos,
+  totais,
+} from '@/lib/dados';
 import { formatBRL, formatComSinal, formatData } from '@/lib/format';
 
-export const metadata = {
-  title: 'Livro-caixa · A.A.A. Engenharia',
-  description:
-    'Livro-caixa público da A.A.A. Engenharia. Toda saída exige 2 de 3 assinaturas.',
-};
-
 const FILTROS = ['Todas', 'Eventos', 'Marketing', 'Esporte', 'Sócios'];
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  // O título é enfeite; se o banco não responder, a página ainda abre e diz o
+  // que houve. Não é aqui que uma falha de rede vira erro 500.
+  const entidade = await entidadePorSlug(slug).catch(() => null);
+  return {
+    title: `Livro-caixa · ${entidade?.nome ?? 'Quórum'}`,
+    description: `Livro-caixa público. Toda saída exige ${QUORUM.de} de ${QUORUM.entre} assinaturas.`,
+  };
+}
 
 /**
  * 5c · Livro-caixa público.
  *
- * Abre sem sessão e sem barra de abas: é a página que um associado manda no
- * grupo. Precisa parecer um extrato oficial, não um feed — daí o trio de
- * totais no topo, a densidade das linhas e o rodapé de publicação.
+ * Abre sem sessão: é a página que um associado manda no grupo. A leitura passa
+ * pelo cliente anônimo e é a política do banco que libera — só entidade com
+ * `publico = true`. Se alguém fechar o livro-caixa, esta página escurece
+ * sozinha, sem precisar de código aqui.
  */
 export default async function LivroCaixa({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  await params;
-  const saldo = ENTIDADE.saldoCentavos;
+  const { slug } = await params;
+
+  // A leitura da entidade entra no mesmo `try` do extrato: esta é a página que
+  // circula em grupo de WhatsApp, e um erro de rede aqui não pode virar a tela
+  // de erro do Next. `notFound()` fica fora, porque ele próprio lança.
+  let entidade, linhas, soma, socios;
+  try {
+    entidade = await entidadePorSlug(slug);
+    if (entidade) {
+      [linhas, soma, socios] = await Promise.all([
+        lancamentos(entidade.id),
+        totais(entidade.id),
+        associados(entidade.id),
+      ]);
+    }
+  } catch (e) {
+    console.error('[livro] falha ao ler', e);
+    return (
+      <Tela>
+        <Hero className="pb-4" titulo="Livro-caixa" />
+        <CorpoTela>
+          <Erro titulo="Não conseguimos abrir o livro-caixa agora">
+            O extrato não carregou. Nada mudou no cofre — tente recarregar a
+            página em instantes.
+          </Erro>
+        </CorpoTela>
+      </Tela>
+    );
+  }
+
+  if (!entidade || !linhas || !soma || socios === undefined) notFound();
+
+  const periodo =
+    linhas.length > 0
+      ? `${formatData(linhas[linhas.length - 1].criado_em)} — ${formatData(linhas[0].criado_em)}`
+      : 'sem lançamentos';
 
   return (
     <Tela>
@@ -47,22 +94,17 @@ export default async function LivroCaixa({
             aberto
           </span>
         </div>
-        <h1 className="t-hero mt-2.5 text-white">{ENTIDADE.nome}</h1>
+        <h1 className="t-hero mt-2.5 text-white">{entidade.nome}</h1>
         <div className="mt-[5px] text-[12.5px] leading-[1.4] font-medium text-white/85">
-          {ENTIDADE.periodo} · {ENTIDADE.associados} associados
+          {periodo} · {socios} associados
         </div>
       </Hero>
 
       <CorpoTela className="pb-4">
-        {/*
-          Os três totais num cartão só, divididos por linha. O corpo do valor é
-          menor de propósito: num extrato, três colunas com alturas diferentes
-          porque uma quebrou é o erro mais grave possível.
-        */}
         <div className="grid grid-cols-3 overflow-hidden rounded-card border border-line bg-surface">
-          <Total rotulo="Entrou" valor={formatBRL(TOTAL_ENTROU)} cor="text-green" borda />
-          <Total rotulo="Saiu" valor={formatBRL(TOTAL_SAIU)} cor="text-ink" borda />
-          <Total rotulo="Saldo" valor={formatBRL(saldo)} cor="text-ink" />
+          <Total rotulo="Entrou" valor={formatBRL(soma.entrou)} cor="text-green" borda />
+          <Total rotulo="Saiu" valor={formatBRL(soma.saiu)} cor="text-ink" borda />
+          <Total rotulo="Saldo" valor={formatBRL(soma.saldo)} cor="text-ink" />
         </div>
 
         <div className="flex gap-2">
@@ -73,12 +115,7 @@ export default async function LivroCaixa({
             </span>
           </div>
           <div className="flex w-[43px] flex-none items-center justify-center rounded-btn border border-line bg-surface">
-            <SlidersHorizontal
-              size={17}
-              strokeWidth={1.8}
-              className="text-blue"
-              aria-hidden
-            />
+            <SlidersHorizontal size={17} strokeWidth={1.8} className="text-blue" aria-hidden />
           </div>
         </div>
 
@@ -97,47 +134,54 @@ export default async function LivroCaixa({
           ))}
         </div>
 
-        <div className="flex flex-col gap-2">
-          {LANCAMENTOS.map((l) => (
-            <article
-              key={l.id}
-              className="flex min-h-[58px] items-center gap-[11px] rounded-[14px] border border-line bg-surface px-3 py-2.5"
-            >
-              <TileIcone
-                icone={l.tipo === 'entrada' ? ArrowUp : ArrowDown}
-                acento={COR_DA_RUBRICA[l.rubrica]}
-                tamanho="md"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="t-item-sm truncate text-ink">{l.descricao}</div>
-                <div className="mt-[5px] flex items-center gap-[7px]">
-                  <Chip acento={COR_DA_RUBRICA[l.rubrica]}>{l.rubrica}</Chip>
-                  <span className="num t-meta text-ink-3">
-                    {formatData(l.data)}
-                  </span>
-                  <a
-                    href={`/comprovante/${l.id}`}
-                    className="text-[10.5px] leading-none font-medium text-blue"
-                  >
-                    comprovante
-                  </a>
-                </div>
-              </div>
-              <span
-                className={`num flex-none text-[14px] leading-none font-extrabold tracking-[-0.03em] ${
-                  l.tipo === 'entrada' ? 'text-green' : 'text-ink'
-                }`}
+        {linhas.length === 0 ? (
+          <LivroVazio />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {linhas.map((l) => (
+              <article
+                key={l.id}
+                className="flex min-h-[58px] items-center gap-[11px] rounded-[14px] border border-line bg-surface px-3 py-2.5"
               >
-                {formatComSinal(l.valorCentavos, l.tipo, { simbolo: false })}
-              </span>
-            </article>
-          ))}
-        </div>
+                <TileIcone
+                  icone={l.tipo === 'entrada' ? ArrowUp : ArrowDown}
+                  acento={COR_DA_RUBRICA[l.rubrica]}
+                  tamanho="md"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="t-item-sm truncate text-ink">{l.descricao}</div>
+                  <div className="mt-[5px] flex items-center gap-[7px]">
+                    <Chip acento={COR_DA_RUBRICA[l.rubrica]}>{l.rubrica}</Chip>
+                    <span className="num t-meta text-ink-3">
+                      {formatData(l.criado_em)}
+                    </span>
+                    {l.tx_signature && (
+                      <a
+                        href={`https://explorer.solana.com/tx/${l.tx_signature}?cluster=devnet`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10.5px] leading-none font-medium text-blue"
+                      >
+                        comprovante
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={`num flex-none text-[14px] leading-none font-extrabold tracking-[-0.03em] ${
+                    l.tipo === 'entrada' ? 'text-green' : 'text-ink'
+                  }`}
+                >
+                  {formatComSinal(l.valor_centavos, l.tipo, { simbolo: false })}
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
 
         <p className="mt-auto border-t border-line pt-[11px] text-[11px] leading-[1.5] text-ink-3">
-          Publicado pela diretoria {ENTIDADE.diretoria} · toda saída exige{' '}
-          {ENTIDADE.quorum.de} de {ENTIDADE.quorum.entre} assinaturas ·
-          atualizado {ENTIDADE.atualizadoEm}
+          Publicado pela diretoria · toda saída exige {QUORUM.de} de{' '}
+          {QUORUM.entre} assinaturas
         </p>
       </CorpoTela>
     </Tela>

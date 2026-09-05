@@ -7,22 +7,29 @@ import { BarraProgresso } from '@/components/BarraProgresso';
 import { BlocoBloqueio } from '@/components/BlocoBloqueio';
 import { Botao } from '@/components/Botao';
 import { Chip } from '@/components/Chip';
+import { COR_DA_RUBRICA, type Rubrica } from '@/components/acentos';
 import { IndicadorAssinaturas } from '@/components/IndicadorAssinaturas';
 import { LinhaDetalhe, ListaDetalhes } from '@/components/LinhaDetalhe';
 import { TileIcone } from '@/components/TileIcone';
-import { formatBRL, formatComSinal } from '@/lib/format';
-import { ENTIDADE, PROPOSTA_RETIDA } from '@/lib/mock';
+import { formatBRL, formatComSinal, primeiroNome } from '@/lib/format';
 
 import { PassoTempo } from './PassoTempo';
 
-/* ── Tipos do que o servidor devolve ────────────────────────────────────── */
+/* ── O que o servidor entrega a este painel ─────────────────────────────── */
 
-type Papel = 'tesoureira' | 'presidente' | 'conselho';
+/**
+ * Os três signatários do cofre, pelo lugar que ocupam na chave — não pelo papel
+ * na diretoria. São as chaves de `SIGNER_*` no ambiente do servidor; o nome de
+ * cada uma vem do banco, então quem assina na tela é quem consta na diretoria.
+ */
+export type Assento = 'tesoureira' | 'presidente' | 'conselho';
 
-const NOME: Record<Papel, string> = {
-  tesoureira: 'Marina Salgado',
-  presidente: 'Letícia Marchetti',
-  conselho: 'Rafael Tonetto',
+/** A proposta em reais. O valor em SOL é da rede; este é o do livro-caixa. */
+export type PropostaDoPainel = {
+  destino: string;
+  chave: string;
+  valorCentavos: number;
+  rubrica: Rubrica;
 };
 
 type Situacao = {
@@ -30,7 +37,7 @@ type Situacao = {
   status?: string;
   assinaturasFeitas?: number;
   assinaturasNecessarias?: number;
-  assinaram?: Papel[];
+  assinaram?: Assento[];
   saldoCaixa?: number;
   transactionIndex?: string;
 };
@@ -52,9 +59,6 @@ type Comprovante = {
 
 type Fase = 'lendo' | 'pronto' | 'trabalhando' | 'bloqueado' | 'executado' | 'offline';
 
-/** A proposta do cenário, para os valores em reais na tela. */
-const PROPOSTA = PROPOSTA_RETIDA!;
-
 /**
  * O cofre de verdade, na tela.
  *
@@ -63,11 +67,25 @@ const PROPOSTA = PROPOSTA_RETIDA!;
  * bloqueio quando falta quórum, a linha do tempo enquanto executa e o
  * comprovante no fim.
  *
+ * Todo o texto em reais — destino, valor, saldo, nomes — chega por props, do
+ * Server Component que leu o banco sob RLS. Este componente não conhece dado
+ * nenhum de mentira.
+ *
  * O bloqueio nunca aparece como erro. `/api/executar` devolve 200 com o
  * estado, e só falha de rede cai no estado offline — são telas diferentes
  * porque são coisas diferentes.
  */
-export function PainelCofre() {
+export function PainelCofre({
+  proposta,
+  nomes,
+  saldoCentavos,
+  associados,
+}: {
+  proposta: PropostaDoPainel;
+  nomes: Record<Assento, string>;
+  saldoCentavos: number;
+  associados: number;
+}) {
   const [fase, setFase] = useState<Fase>('lendo');
   const [situacao, setSituacao] = useState<Situacao>({ existe: false });
   const [bloqueio, setBloqueio] = useState<Bloqueio | null>(null);
@@ -137,16 +155,20 @@ export function PainelCofre() {
     if (d) await lerSituacao();
   }
 
-  async function assinar(papel: Papel) {
-    const d = await chamar('/api/assinar', { papel }, `Assinatura de ${NOME[papel]}`);
+  async function assinar(assento: Assento) {
+    const d = await chamar(
+      '/api/assinar',
+      { papel: assento },
+      `Assinatura de ${nomes[assento]}`,
+    );
     if (!d) return;
     setSituacao({ existe: true, ...d });
     setBloqueio(null);
     setFase('pronto');
   }
 
-  async function executar(papel: Papel) {
-    const d = await chamar('/api/executar', { papel }, 'Enviando ao banco');
+  async function executar(assento: Assento) {
+    const d = await chamar('/api/executar', { papel: assento }, 'Enviando a saída');
     if (!d) return;
 
     if (d.bloqueado) {
@@ -209,11 +231,27 @@ export function PainelCofre() {
   }
 
   if (fase === 'trabalhando') {
-    return <LinhaDoTempo rotulo={rotulo} segundos={segundos} situacao={situacao} />;
+    return (
+      <LinhaDoTempo
+        rotulo={rotulo}
+        segundos={segundos}
+        situacao={situacao}
+        proposta={proposta}
+        nomes={nomes}
+      />
+    );
   }
 
   if (fase === 'executado' && comprovante) {
-    return <Comprovante_ dados={comprovante} />;
+    return (
+      <Comprovante_
+        dados={comprovante}
+        proposta={proposta}
+        nomes={nomes}
+        saldoCentavos={saldoCentavos}
+        associados={associados}
+      />
+    );
   }
 
   const feitas = situacao.assinaturasFeitas ?? 0;
@@ -225,18 +263,18 @@ export function PainelCofre() {
     <article className="rounded-card border border-line bg-surface-2 p-[15px]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="t-item text-ink">{PROPOSTA.destino}</h2>
+          <h2 className="t-item text-ink">{proposta.destino}</h2>
           <div className="num mt-1.5 text-[12.5px] leading-[1.3] font-normal text-ink-3">
-            chave {PROPOSTA.chave}
+            chave {proposta.chave}
           </div>
         </div>
         <div className="t-valor text-ink">
-          {formatComSinal(PROPOSTA.valorCentavos, 'saida', { compacto: true })}
+          {formatComSinal(proposta.valorCentavos, 'saida', { compacto: true })}
         </div>
       </div>
 
       <div className="mt-3 flex items-center gap-[7px]">
-        <Chip acento="blue">{PROPOSTA.rubrica}</Chip>
+        <Chip acento={COR_DA_RUBRICA[proposta.rubrica]}>{proposta.rubrica}</Chip>
         <span className="num t-meta text-ink-3">
           proposta #{situacao.transactionIndex} · {situacao.status}
         </span>
@@ -245,14 +283,15 @@ export function PainelCofre() {
       <div className="my-3.5 h-px bg-line" />
 
       <IndicadorAssinaturas
-        assinaturas={assinaram.map((p) => ({ nome: NOME[p] }))}
+        assinaturas={assinaram.map((a) => ({ nome: nomes[a] }))}
         necessarias={necessarias}
       />
 
       {bloqueio && (
         <BlocoBloqueio className="mt-3.5">
-          Falta a assinatura da presidente ou do conselho fiscal. Ao assinar, a
-          saída é executada na hora.
+          Falta a assinatura de {primeiroNome(nomes.presidente)} ou de{' '}
+          {primeiroNome(nomes.conselho)}. Ao assinar, a saída é executada na
+          hora.
           {bloqueio.explorador && (
             <>
               {' '}
@@ -281,12 +320,12 @@ export function PainelCofre() {
             </Botao>
             {feitas === 0 && (
               <Botao variante="secundario" onClick={() => void assinar('tesoureira')}>
-                Assinar como {NOME.tesoureira.split(' ')[0]}
+                Assinar como {primeiroNome(nomes.tesoureira)}
               </Botao>
             )}
             {feitas > 0 && (
               <Botao variante="secundario" onClick={() => void assinar('presidente')}>
-                Assinar como {NOME.presidente.split(' ')[0]}
+                Assinar como {primeiroNome(nomes.presidente)}
               </Botao>
             )}
           </>
@@ -323,10 +362,14 @@ function LinhaDoTempo({
   rotulo,
   segundos,
   situacao,
+  proposta,
+  nomes,
 }: {
   rotulo: string;
   segundos: number;
   situacao: Situacao;
+  proposta: PropostaDoPainel;
+  nomes: Record<Assento, string>;
 }) {
   const feitas = situacao.assinaturasFeitas ?? 0;
   const necessarias = situacao.assinaturasNecessarias ?? 2;
@@ -338,7 +381,7 @@ function LinhaDoTempo({
           <div>
             <div className="t-rotulo text-ink-2">Valor da saída</div>
             <div className="t-ancora mt-[11px] text-ink">
-              {formatComSinal(PROPOSTA.valorCentavos, 'saida')}
+              {formatComSinal(proposta.valorCentavos, 'saida')}
             </div>
           </div>
           <div className="text-right">
@@ -364,22 +407,22 @@ function LinhaDoTempo({
         <PassoTempo
           estado={feitas >= 1 ? 'feito' : 'agora'}
           titulo="1ª assinatura registrada"
-          detalhe={feitas >= 1 ? NOME.tesoureira : 'aguardando'}
+          detalhe={feitas >= 1 ? nomes.tesoureira : 'aguardando'}
         />
         <PassoTempo
           estado={feitas >= 2 ? 'feito' : feitas === 1 ? 'agora' : 'futuro'}
           titulo="2ª assinatura registrada"
           detalhe={
             feitas >= necessarias
-              ? `${NOME.presidente} · quórum atingido`
+              ? `${nomes.presidente} · quórum atingido`
               : 'aguardando o segundo signatário'
           }
           conectorGradiente={feitas >= 1}
         />
         <PassoTempo
           estado="agora"
-          titulo="Enviando ao banco"
-          detalhe="Aguardando a confirmação da transação"
+          titulo="Enviando a saída"
+          detalhe="Aguardando a confirmação da rede"
           progresso={Math.min(95, 30 + segundos * 7)}
         />
         <PassoTempo
@@ -397,8 +440,20 @@ function LinhaDoTempo({
   );
 }
 
-function Comprovante_({ dados }: { dados: Comprovante }) {
-  const saldoDepois = ENTIDADE.saldoCentavos - PROPOSTA.valorCentavos;
+function Comprovante_({
+  dados,
+  proposta,
+  nomes,
+  saldoCentavos,
+  associados,
+}: {
+  dados: Comprovante;
+  proposta: PropostaDoPainel;
+  nomes: Record<Assento, string>;
+  saldoCentavos: number;
+  associados: number;
+}) {
+  const saldoDepois = saldoCentavos - proposta.valorCentavos;
 
   return (
     <div className="flex flex-col gap-[11px]">
@@ -406,19 +461,19 @@ function Comprovante_({ dados }: { dados: Comprovante }) {
         <div className="border-b border-line p-4">
           <div className="t-rotulo text-ink-2">Comprovante de saída</div>
           <div className="t-ancora mt-[11px] text-ink">
-            {formatComSinal(PROPOSTA.valorCentavos, 'saida')}
+            {formatComSinal(proposta.valorCentavos, 'saida')}
           </div>
           <div className="mt-[11px] flex items-center gap-[7px]">
-            <Chip acento="blue">{PROPOSTA.rubrica}</Chip>
+            <Chip acento={COR_DA_RUBRICA[proposta.rubrica]}>{proposta.rubrica}</Chip>
             <Chip acento="green">Executada</Chip>
           </div>
         </div>
 
         <div className="border-b border-line px-4 py-3.5">
           <ListaDetalhes>
-            <LinhaDetalhe rotulo="Destinatário">{PROPOSTA.destino}</LinhaDetalhe>
+            <LinhaDetalhe rotulo="Destinatário">{proposta.destino}</LinhaDetalhe>
             <LinhaDetalhe rotulo="Chave" mono>
-              {PROPOSTA.chave}
+              {proposta.chave}
             </LinhaDetalhe>
             <LinhaDetalhe rotulo="Saldo após" destaque>
               {formatBRL(saldoDepois)}
@@ -429,7 +484,7 @@ function Comprovante_({ dados }: { dados: Comprovante }) {
         <div className="border-b border-line px-4 py-3.5">
           <div className="t-rotulo mb-3 text-ink-2">Assinaturas</div>
           <IndicadorAssinaturas
-            assinaturas={[{ nome: NOME.tesoureira }, { nome: NOME.presidente }]}
+            assinaturas={[{ nome: nomes.tesoureira }, { nome: nomes.presidente }]}
             necessarias={2}
           />
         </div>
@@ -467,7 +522,7 @@ function Comprovante_({ dados }: { dados: Comprovante }) {
         <div className="min-w-0 flex-1">
           <div className="t-item-sm text-ink">Publicado no livro-caixa</div>
           <div className="t-meta mt-[5px] text-green-ink">
-            Visível aos {ENTIDADE.associados} associados agora
+            Visível aos {associados} associados agora
           </div>
         </div>
       </div>
