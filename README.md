@@ -43,6 +43,7 @@ npm run ciclo                  # cria o cofre, propõe, assina, executa
 | `NEXT_PUBLIC_SITE_URL` | público | endereço de produção, para o link do e-mail voltar certo |
 | `SIGNER_COMPRADOR` | servidor | opcional — quem paga o ingresso na demonstração |
 | `COTACAO_CENTAVOS_POR_SOL` | servidor | opcional — cotação da demonstração, padrão 10000000 |
+| `ORIGENS_PERMITIDAS` | servidor | origens liberadas para chamar `/api/*` de outro domínio |
 
 Nada sensível leva o prefixo `NEXT_PUBLIC_`. O bundler remove do browser tudo
 que não tem esse prefixo, e `lib/env.ts` estoura no boot dizendo qual variável
@@ -114,6 +115,23 @@ então serve em CI:
 npm run dev &
 npm run conferir /e/aaaeng/livro
 ```
+
+## Interface em outro domínio
+
+As telas deste repositório são completas e funcionam sozinhas. Se a interface
+for construída fora — no Lovable, por exemplo —, este app vira a **API** e o
+outro domínio vira a **interface**:
+
+- `docs/API.md` — o contrato dos endpoints e o que o RLS deixa cada um ler.
+- `docs/BRIEF-lovable.md` — briefing pronto para colar, com tokens, regras e
+  vocabulário.
+
+Cadastre a origem em `ORIGENS_PERMITIDAS` e o domínio nos *Redirect URLs* do
+Supabase, senão o link do e-mail não volta.
+
+As bibliotecas da rede e as chaves privadas continuam **só no servidor**. É por
+isso que os endpoints existem: o front pede, o servidor assina. Chave privada
+no bundle do front é chave publicada.
 
 ## Sobre o pagamento
 
