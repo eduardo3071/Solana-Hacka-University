@@ -17,6 +17,7 @@ import * as multisig from '@sqds/multisig';
 
 import {
   conexao,
+  confirmar,
   ehFaltaDeQuorum,
   exigirEstado,
   explorador,
@@ -53,7 +54,7 @@ try {
     member: quem.keypair.publicKey,
     signers: [quem.keypair],
   });
-  await conn.confirmTransaction(assinatura, 'confirmed');
+  await confirmar(conn, assinatura);
 
   console.log('\n  ✓ SAÍDA EXECUTADA');
   console.log(`  caixa depois:     ${sol(await conn.getBalance(vaultPda))} SOL`);

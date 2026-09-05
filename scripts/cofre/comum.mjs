@@ -120,6 +120,46 @@ export function explorador(assinatura) {
 }
 
 /**
+ * Espera a transação ser confirmada pela rede.
+ *
+ * As funções `rpc.*` do SDK ENVIAM e devolvem a assinatura na hora, sem
+ * esperar. Encadear duas sem confirmar a primeira é corrida: o passo seguinte
+ * lê um estado que ainda não mudou. Foi o que derrubou o `proposalCreate`, que
+ * pedia proposta para um índice que a rede ainda não conhecia.
+ *
+ * Consulta o status em vez de usar `confirmTransaction` com blockhash novo,
+ * que expira por conta própria e falha por motivo errado.
+ */
+export async function confirmar(conn, assinatura, segundos = 60) {
+  const limite = Date.now() + segundos * 1000;
+
+  while (Date.now() < limite) {
+    const { value } = await conn.getSignatureStatus(assinatura, {
+      searchTransactionHistory: true,
+    });
+
+    if (value?.err) {
+      throw new Error(
+        `Transação ${assinatura} falhou na rede: ${JSON.stringify(value.err)}`,
+      );
+    }
+    if (
+      value?.confirmationStatus === 'confirmed' ||
+      value?.confirmationStatus === 'finalized'
+    ) {
+      return assinatura;
+    }
+
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  throw new Error(
+    `Transação ${assinatura} não confirmou em ${segundos}s. ` +
+      'RPC lento ou estrangulando por limite.',
+  );
+}
+
+/**
  * Converte o `bignum` do beet para BigInt.
  *
  * O SDK devolve ora número, ora BN, dependendo do tamanho — passar direto para
@@ -139,13 +179,25 @@ export const paraBigInt = (v) => BigInt(v.toString());
  * infraestrutura.
  */
 export function ehFaltaDeQuorum(erro) {
+  // Código do InvalidProposalStatus no programa. Em hexadecimal, 0x1778 — é
+  // assim que ele aparece quando a transação falha on-chain em vez de na
+  // simulação.
+  const CODIGO = 6008;
+
+  if (erro?.code === CODIGO) return true;
+
   const texto = [
     erro?.name,
     erro?.message,
+    JSON.stringify(erro?.err ?? ''),
     ...(Array.isArray(erro?.logs) ? erro.logs : []),
   ]
     .filter(Boolean)
     .join(' ');
 
-  return /InvalidProposalStatus|Invalid proposal status/i.test(texto);
+  return (
+    /InvalidProposalStatus|Invalid proposal status/i.test(texto) ||
+    new RegExp(`custom program error:\\s*0x${CODIGO.toString(16)}`, 'i').test(texto) ||
+    new RegExp(`"Custom"\\s*:\\s*${CODIGO}\\b`).test(texto)
+  );
 }

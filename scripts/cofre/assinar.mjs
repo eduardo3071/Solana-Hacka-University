@@ -11,6 +11,7 @@ import * as multisig from '@sqds/multisig';
 
 import {
   conexao,
+  confirmar,
   exigirEstado,
   explorador,
   RPC,
@@ -47,7 +48,7 @@ const assinatura = await multisig.rpc.proposalApprove({
   multisigPda,
   transactionIndex,
 });
-await conn.confirmTransaction(assinatura, 'confirmed');
+await confirmar(conn, assinatura);
 
 const depois = await Proposal.fromAccountAddress(conn, proposalPda);
 const feitas = depois.approved.length;

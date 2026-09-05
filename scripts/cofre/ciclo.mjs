@@ -22,6 +22,7 @@ import bs58 from 'bs58';
 
 import {
   conexao,
+  confirmar,
   ehFaltaDeQuorum,
   explorador,
   gravarEstado,
@@ -77,7 +78,7 @@ const assinaturaCriacao = await multisig.rpc.multisigCreateV2({
   rentCollector: null,
   sendOptions: { skipPreflight: false },
 });
-await conn.confirmTransaction(assinaturaCriacao, 'confirmed');
+await confirmar(conn, assinaturaCriacao);
 
 const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 ok(`cofre  ${multisigPda.toBase58()}`);
@@ -117,7 +118,7 @@ const mensagem = new TransactionMessage({
   ],
 });
 
-await multisig.rpc.vaultTransactionCreate({
+const assinaturaTransacao = await multisig.rpc.vaultTransactionCreate({
   connection: conn,
   feePayer: tesoureira.keypair,
   multisigPda,
@@ -128,14 +129,17 @@ await multisig.rpc.vaultTransactionCreate({
   transactionMessage: mensagem,
   memo: 'Som Beira-Mar ME · Eventos',
 });
+// A proposta só pode existir para um índice que a rede já conhece.
+await confirmar(conn, assinaturaTransacao);
 
-await multisig.rpc.proposalCreate({
+const assinaturaProposta = await multisig.rpc.proposalCreate({
   connection: conn,
   feePayer: tesoureira.keypair,
   creator: tesoureira.keypair,
   multisigPda,
   transactionIndex,
 });
+await confirmar(conn, assinaturaProposta);
 
 gravarEstado({
   multisigPda,
@@ -152,13 +156,14 @@ ok(`proposta #${transactionIndex} registrada · destino ${destino.toBase58()}`);
 
 passo(4, `1ª assinatura — ${tesoureira.nome}`);
 
-await multisig.rpc.proposalApprove({
+const assinatura1 = await multisig.rpc.proposalApprove({
   connection: conn,
   feePayer: tesoureira.keypair,
   member: tesoureira.keypair,
   multisigPda,
   transactionIndex,
 });
+await confirmar(conn, assinatura1);
 
 const [proposalPda] = multisig.getProposalPda({ multisigPda, transactionIndex });
 let proposta = await Proposal.fromAccountAddress(conn, proposalPda);
@@ -169,7 +174,7 @@ ok(`${proposta.approved.length} de ${infoMultisig.threshold} assinaturas`);
 passo(5, 'Tentando executar com UMA assinatura');
 
 try {
-  await multisig.rpc.vaultTransactionExecute({
+  const tentativa = await multisig.rpc.vaultTransactionExecute({
     connection: conn,
     feePayer: tesoureira.keypair,
     multisigPda,
@@ -177,6 +182,9 @@ try {
     member: tesoureira.keypair.publicKey,
     signers: [tesoureira.keypair],
   });
+  // A recusa pode vir na simulação (lança acima) ou só on-chain. Sem
+  // confirmar, uma execução que falhou na rede passaria por bem-sucedida.
+  await confirmar(conn, tentativa);
 
   console.error('\n✗ A EXECUÇÃO PASSOU COM UMA ASSINATURA.');
   console.error('  O cofre não está segurando o dinheiro. Isto é um defeito');
@@ -200,13 +208,14 @@ try {
 
 passo(6, `2ª assinatura — ${presidente.nome}`);
 
-await multisig.rpc.proposalApprove({
+const assinatura2 = await multisig.rpc.proposalApprove({
   connection: conn,
   feePayer: presidente.keypair,
   member: presidente.keypair,
   multisigPda,
   transactionIndex,
 });
+await confirmar(conn, assinatura2);
 
 proposta = await Proposal.fromAccountAddress(conn, proposalPda);
 ok(`${proposta.approved.length} de ${infoMultisig.threshold} — quórum atingido`);
@@ -223,7 +232,7 @@ const assinaturaExecucao = await multisig.rpc.vaultTransactionExecute({
   member: presidente.keypair.publicKey,
   signers: [presidente.keypair],
 });
-await conn.confirmTransaction(assinaturaExecucao, 'confirmed');
+await confirmar(conn, assinaturaExecucao);
 
 ok(`caixa depois: ${sol(await conn.getBalance(vaultPda))} SOL`);
 ok(`destino recebeu: ${sol(await conn.getBalance(destino))} SOL`);
