@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Segredos — NUNCA commitar.
+# .env.local guarda a service role key e as chaves dos signatários.
+.env
+.env.local
+.env*.local
+.env.production
+
+# Vercel / TS
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+.DS_Store
+*.pem
+npm-debug.log*
