@@ -152,6 +152,39 @@ export function formatData(iso: string | Date): string {
   return DIA_MES.format(d);
 }
 
+const QUANDO_FESTA = new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'short',
+  day: '2-digit',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'America/Sao_Paulo',
+});
+
+/**
+ * O "quando" do cartaz da festa: `"Sáb, 26 set · 23h"`.
+ *
+ * Montado peça por peça porque nenhum formato pronto do Intl dá isso: o padrão
+ * em pt-BR é "sáb., 26 de set. de 2026, 23:00", que não cabe no cartão da
+ * prancha 5d e truncaria justamente no dado que importa. Hora redonda perde os
+ * minutos — "23h" e não "23h00", como se fala.
+ */
+export function formatQuandoFesta(iso: string | Date): string {
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (Number.isNaN(d.getTime())) return '';
+
+  const partes = QUANDO_FESTA.formatToParts(d);
+  const parte = (tipo: Intl.DateTimeFormatPartTypes) =>
+    (partes.find((p) => p.type === tipo)?.value ?? '').replace('.', '');
+
+  const semana = parte('weekday');
+  const minuto = parte('minute');
+  const hora = minuto === '00' ? `${parte('hour')}h` : `${parte('hour')}h${minuto}`;
+
+  return `${semana.charAt(0).toUpperCase()}${semana.slice(1)}, ${parte('day')} ${parte('month')} · ${hora}`;
+}
+
 /** `"18:12"`. */
 export function formatHora(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;

@@ -7,6 +7,7 @@ import { Erro, LivroVazio } from '@/components/Estados';
 import { Hero } from '@/components/Hero';
 import { CorpoTela, Tela } from '@/components/Tela';
 import { TileIcone } from '@/components/TileIcone';
+import { AtualizaSozinho } from '@/components/vivo/AtualizaSozinho';
 import {
   QUORUM,
   associados,
@@ -85,6 +86,9 @@ export default async function LivroCaixa({
 
   return (
     <Tela>
+      {/* Uma compra feita na página da festa aparece aqui sozinha. */}
+      <AtualizaSozinho />
+
       <Hero className="pb-4">
         <div className="flex items-center justify-between gap-3">
           <span className="t-rotulo whitespace-nowrap text-white/80">

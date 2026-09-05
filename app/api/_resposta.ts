@@ -17,6 +17,6 @@ export function erro(mensagem: string, causa: unknown, status = 500) {
 export function ehErroDeConfiguracao(e: unknown): boolean {
   return (
     e instanceof Error &&
-    /não está no \.env\.local|Nenhum cofre criado/.test(e.message)
+    /não está no \.env\.local|Nenhum cofre criado|ainda não tem cofre/.test(e.message)
   );
 }

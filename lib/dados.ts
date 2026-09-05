@@ -83,8 +83,8 @@ export const QUORUM = { de: 2, entre: 3 } as const;
  * o cabeçalho e o corpo da página pedem a mesma coisa e o banco responde uma
  * vez só.
  *
- * Na primeira visita chama `vincular_membro`, que casa o e-mail do magic link
- * com a linha da diretoria. Sem isso, quem entra fica sem papel nenhum.
+ * Na primeira visita liga a sessão à linha da diretoria pelo e-mail. Sem isso,
+ * quem entra fica sem papel nenhum.
  */
 export const usuarioAtual = cache(async () => {
   const supabase = await criarClienteServidor();
@@ -94,20 +94,59 @@ export const usuarioAtual = cache(async () => {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  await supabase.schema('privado').rpc('vincular_membro');
+  const ler = () =>
+    supabase
+      .from('membros')
+      .select('id, nome, papel, email, ativo, entidade_id')
+      .eq('user_id', user.id)
+      .eq('ativo', true)
+      .maybeSingle();
 
-  const { data } = await supabase
-    .from('membros')
-    .select('id, nome, papel, email, ativo, entidade_id')
-    .eq('user_id', user.id)
-    .eq('ativo', true)
-    .maybeSingle();
+  let { data } = await ler();
+  if (!data) {
+    await vincularPeloEmail(user.id, user.email);
+    ({ data } = await ler());
+  }
 
   if (!data) return { user, membro: null as Membro | null, entidadeId: null };
 
   const { entidade_id, ...membro } = data;
   return { user, membro: membro as Membro, entidadeId: entidade_id as string };
 });
+
+/**
+ * Casa a sessão com a linha que a diretoria cadastrou, pelo e-mail.
+ *
+ * Roda com a service role porque a política de `membros` não permite que o
+ * usuário escreva — e não deve mesmo permitir. A escrita é estreita de
+ * propósito: só a linha cujo e-mail é igual ao da sessão JÁ VERIFICADA pelo
+ * magic link, e só enquanto `user_id` estiver vazio. Uma linha já vinculada
+ * nunca é reapontada, então ninguém toma o lugar de outra pessoa trocando o
+ * e-mail do próprio cadastro.
+ *
+ * Foi tentado antes como função `privado.vincular_membro()` chamada por RPC.
+ * Não funciona: o schema `privado` existe justamente para NÃO ser publicado
+ * pelo PostgREST, então a chamada nunca chegava — e falhava calada, deixando
+ * quem entrava sem papel. Aqui não há intermediário.
+ *
+ * A comparação é `eq` em minúsculas, e não `ilike`: e-mail pode conter `_`, que
+ * em `ilike` é curinga de um caractere — `joao_silva@x` casaria com
+ * `joaoXsilva@x`. O banco guarda o e-mail sempre em minúsculas (migração 0006)
+ * e o Supabase entrega o da sessão assim também, então igualdade basta e não
+ * tem curinga nenhum no meio.
+ */
+async function vincularPeloEmail(userId: string, email?: string) {
+  if (!email) return;
+
+  const { criarClienteServiceRole } = await import('@/lib/supabase/server');
+  const { error } = await criarClienteServiceRole()
+    .from('membros')
+    .update({ user_id: userId })
+    .is('user_id', null)
+    .eq('email', email.toLowerCase());
+
+  if (error) console.error('[sessão] não conseguimos ligar o e-mail à diretoria', error);
+}
 
 /* ── Entidade ───────────────────────────────────────────────────────────── */
 
@@ -237,4 +276,31 @@ export const eventoPorSlug = cache(async (slug: string) => {
   // estudante lê quando o que houve foi o banco fora do ar.
   if (error) throw error;
   return data;
+});
+
+export type Lote = {
+  id: string;
+  nome: string;
+  preco_centavos: number;
+  total: number;
+  vendidos: number;
+};
+
+/**
+ * Os lotes de um evento, na ordem do cartaz.
+ *
+ * Lê com o cliente anônimo: lote é público por política, ao contrário de
+ * `ingressos`. É por isso que `vendidos` é coluna e não `count(*)` — ver a
+ * migração 0004.
+ */
+export const lotesDoEvento = cache(async (eventoId: string) => {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from('lotes')
+    .select('id, nome, preco_centavos, total, vendidos')
+    .eq('evento_id', eventoId)
+    .order('ordem');
+
+  if (error) throw error;
+  return (data ?? []) as Lote[];
 });

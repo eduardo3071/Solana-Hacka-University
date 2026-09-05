@@ -1,9 +1,11 @@
-import { Calendar, MapPin, QrCode } from 'lucide-react';
+import { Calendar, MapPin } from 'lucide-react';
 
 import { Erro, Vazio } from '@/components/Estados';
 import { Tela } from '@/components/Tela';
 import { TileIcone } from '@/components/TileIcone';
-import { eventoPorSlug } from '@/lib/dados';
+import { ComprarIngresso } from '@/components/vivo/ComprarIngresso';
+import { eventoPorSlug, lotesDoEvento } from '@/lib/dados';
+import { formatQuandoFesta } from '@/lib/format';
 import { criarClienteServidor } from '@/lib/supabase/server';
 
 /** Página pública: o cartaz muda quando a diretoria muda o evento. */
@@ -22,8 +24,11 @@ export async function generateMetadata({
 /**
  * 5d · Página da festa — pública, sem barra de abas, a mais vistosa.
  *
- * A única tela onde uma imagem grande é permitida. O cartão verde do Pix é a
- * proposta de valor inteira do produto.
+ * A única tela onde uma imagem grande é permitida.
+ *
+ * É aqui que o circuito fecha (B7): comprar um ingresso gera uma referência
+ * única, o pagamento cita essa referência, e a entrada aparece sozinha no
+ * livro-caixa público. Ninguém digita nada em lugar nenhum.
  */
 export default async function PaginaDaFesta({
   params,
@@ -32,17 +37,21 @@ export default async function PaginaDaFesta({
 }) {
   const { slug } = await params;
 
-  let evento, entidade;
+  let evento, entidade, lotes;
   try {
     evento = await eventoPorSlug(slug);
     if (evento) {
       const supabase = await criarClienteServidor();
-      const { data } = await supabase
-        .from('entidades')
-        .select('nome, slug')
-        .eq('id', evento.entidade_id)
-        .maybeSingle();
+      const [{ data }, doEvento] = await Promise.all([
+        supabase
+          .from('entidades')
+          .select('nome, slug')
+          .eq('id', evento.entidade_id)
+          .maybeSingle(),
+        lotesDoEvento(evento.id),
+      ]);
       entidade = data;
+      lotes = doEvento;
     }
   } catch (e) {
     console.error('[festa] falha ao ler', e);
@@ -70,15 +79,6 @@ export default async function PaginaDaFesta({
     );
   }
 
-  const quando = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/Sao_Paulo',
-  }).format(new Date(evento.data));
-
   return (
     <Tela>
       <div className="relative h-60 flex-none overflow-hidden bg-[repeating-linear-gradient(135deg,#1F2D41_0_8px,#192434_8px_16px)]">
@@ -91,45 +91,33 @@ export default async function PaginaDaFesta({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-[11px] px-4 pt-3.5 pb-4">
-        <div className="grid grid-cols-2 gap-2.5">
-          <CartaoQuandoOnde
-            icone={Calendar}
-            acento="blue"
-            rotulo="Quando"
-            valor={quando}
-          />
-          <CartaoQuandoOnde
-            icone={MapPin}
-            acento="purple"
-            rotulo="Onde"
-            valor={evento.local ?? 'a definir'}
-          />
-        </div>
-
-        {/* A proposta de valor inteira do produto. */}
-        <div className="mt-0.5 flex items-center gap-[13px] rounded-card border border-green/30 bg-green-tint p-3.5">
-          <div className="flex size-[76px] flex-none items-center justify-center rounded-tile border border-green/35 bg-[#0F2A20]">
-            <QrCode size={34} strokeWidth={1.6} className="text-green" aria-hidden />
+      <ComprarIngresso
+        topo={
+          <div className="grid grid-cols-2 gap-2.5">
+            <CartaoQuandoOnde
+              icone={Calendar}
+              acento="blue"
+              rotulo="Quando"
+              valor={formatQuandoFesta(evento.data)}
+            />
+            <CartaoQuandoOnde
+              icone={MapPin}
+              acento="purple"
+              rotulo="Onde"
+              valor={evento.local ?? 'a definir'}
+            />
           </div>
-          <div className="min-w-0">
-            <div className="t-item text-ink">Pague com Pix e receba na hora</div>
-            <p className="t-desc mt-1.5 text-pretty text-green-ink">
-              O valor cai direto no cofre da atlética. Nada passa por conta
-              pessoal.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-none border-t border-line bg-tabbar px-4 pt-3 pb-[18px]">
-        <p className="text-center text-[12.5px] leading-[1.4] text-ink-3">
-          Livro-caixa da entidade aberto em{' '}
-          <a href={`/e/${entidade?.slug}/livro`} className="text-blue">
-            quorum.app/{entidade?.slug}
-          </a>
-        </p>
-      </div>
+        }
+        lotes={(lotes ?? []).map((l) => ({
+          id: l.id,
+          nome: l.nome,
+          precoCentavos: l.preco_centavos,
+          total: l.total,
+          vendidos: l.vendidos,
+        }))}
+        entidadeSlug={entidade?.slug ?? ''}
+        livroHref={`/e/${entidade?.slug}/livro`}
+      />
     </Tela>
   );
 }
@@ -150,7 +138,9 @@ function CartaoQuandoOnde({
       <TileIcone icone={icone} acento={acento} tamanho="md" />
       <div className="min-w-0 flex-1">
         <div className="t-rotulo text-ink-2">{rotulo}</div>
-        <div className="mt-1.5 truncate text-[12px] leading-[1.2] font-bold text-ink">
+        {/* Sem `truncate`: "Galpão Beira-Mar" cortado vira endereço errado.
+            Quando não couber, desce para a linha seguinte — é a regra. */}
+        <div className="mt-1.5 text-[12px] leading-[1.25] font-bold text-balance text-ink">
           {valor}
         </div>
       </div>
