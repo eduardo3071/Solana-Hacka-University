@@ -203,7 +203,7 @@ create policy "eventos são públicos"
 create policy "comprador vê o próprio ingresso"
   on public.ingressos for select
   to authenticated
-  using (comprador_id = auth.uid());
+  using (comprador_id = (select auth.uid()));
 
 create policy "diretoria vê os ingressos da própria entidade"
   on public.ingressos for select
@@ -263,7 +263,7 @@ create policy "signatário propõe saída na própria entidade"
     )
     and criado_por in (
       select m.id from public.membros m
-      where m.user_id = auth.uid() and m.entidade_id = propostas.entidade_id
+      where m.user_id = (select auth.uid()) and m.entidade_id = propostas.entidade_id
     )
   );
 
@@ -294,7 +294,7 @@ create policy "só signatário assina, e só por si"
       from public.propostas p
       join public.membros m on m.id = assinaturas.membro_id
       where p.id = assinaturas.proposta_id
-        and m.user_id = auth.uid()
+        and m.user_id = (select auth.uid())
         and m.entidade_id = p.entidade_id
         and m.ativo
         and m.papel in ('presidente', 'tesoureiro', 'conselho')
