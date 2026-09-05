@@ -10,6 +10,8 @@ export const metadata = { title: 'Entrar · Quórum' };
 const AVISOS: Record<string, string> = {
   expirado: 'Esse link já venceu ou já foi usado. Peça outro abaixo.',
   link: 'O link veio incompleto. Peça outro abaixo.',
+  'outro-navegador':
+    'Abra o link no mesmo aparelho em que você pediu. Se preferir, peça outro aqui.',
 };
 
 /**
