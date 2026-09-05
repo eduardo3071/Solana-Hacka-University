@@ -58,11 +58,40 @@ const ENTIDADE = {
   publico: true,
 };
 
+/**
+ * A diretoria, com e-mails de mentira por padrão.
+ *
+ * Ninguém recebe link num `@grad.ufsc.br` que não existe. Para entrar de
+ * verdade — na sua máquina ou na demonstração — aponte a persona que você vai
+ * usar para uma caixa que você abre, definindo no `.env.local`:
+ *
+ *   EMAIL_TESOUREIRA=voce@gmail.com
+ *   EMAIL_PRESIDENTE=voce+presidente@gmail.com
+ *
+ * O `+alguma-coisa` do Gmail cai na mesma caixa e conta como endereço distinto,
+ * o que dá as duas personas do teste de dois navegadores sem criar outra conta.
+ *
+ * Fica em variável, e não escrito aqui, porque e-mail pessoal não vai para o
+ * repositório — e porque assim `npm run seed -- --forcar` não desfaz o que você
+ * configurou.
+ */
 const DIRETORIA = [
-  { nome: 'Letícia Marchetti', papel: 'presidente', email: 'leticia.marchetti@grad.ufsc.br' },
-  { nome: 'Marina Salgado', papel: 'tesoureiro', email: 'marina.salgado@grad.ufsc.br' },
-  { nome: 'Rafael Tonetto', papel: 'conselho', email: 'rafael.tonetto@grad.ufsc.br' },
-];
+  {
+    nome: 'Letícia Marchetti',
+    papel: 'presidente',
+    email: doEnv('EMAIL_PRESIDENTE') ?? 'leticia.marchetti@grad.ufsc.br',
+  },
+  {
+    nome: 'Marina Salgado',
+    papel: 'tesoureiro',
+    email: doEnv('EMAIL_TESOUREIRA') ?? 'marina.salgado@grad.ufsc.br',
+  },
+  {
+    nome: 'Rafael Tonetto',
+    papel: 'conselho',
+    email: doEnv('EMAIL_CONSELHO') ?? 'rafael.tonetto@grad.ufsc.br',
+  },
+].map((m) => ({ ...m, email: m.email.toLowerCase() }));
 
 /**
  * "62 associados" no cabeçalho da prancha 5a são 62 linhas de verdade.
