@@ -172,6 +172,21 @@ export const associados = cache(async (entidadeId: string) => {
   return count ?? 0;
 });
 
+/** Todos os membros, para a lista de sócios. Signatários primeiro. */
+export const membros = cache(async (entidadeId: string) => {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from('membros')
+    .select('id, nome, papel, email, ativo')
+    .eq('entidade_id', entidadeId)
+    .eq('ativo', true)
+    .order('papel')
+    .order('nome');
+
+  if (error) throw error;
+  return (data ?? []) as Membro[];
+});
+
 export const signatarios = cache(async (entidadeId: string) => {
   const supabase = await criarClienteServidor();
   const { data } = await supabase
@@ -186,20 +201,33 @@ export const signatarios = cache(async (entidadeId: string) => {
 
 /* ── Livro-caixa ────────────────────────────────────────────────────────── */
 
-export const lancamentos = cache(async (entidadeId: string, limite?: number) => {
-  const supabase = await criarClienteServidor();
-  let q = supabase
-    .from('lancamentos')
-    .select('id, tipo, valor_centavos, rubrica, descricao, criado_em, tx_signature')
-    .eq('entidade_id', entidadeId)
-    .order('criado_em', { ascending: false });
+export type FiltroLivro = { rubrica?: Rubrica; busca?: string };
 
-  if (limite) q = q.limit(limite);
+export const lancamentos = cache(
+  async (entidadeId: string, limite?: number, filtro: FiltroLivro = {}) => {
+    const supabase = await criarClienteServidor();
+    let q = supabase
+      .from('lancamentos')
+      .select('id, tipo, valor_centavos, rubrica, descricao, criado_em, tx_signature')
+      .eq('entidade_id', entidadeId)
+      .order('criado_em', { ascending: false });
 
-  const { data, error } = await q;
-  if (error) throw error;
-  return (data ?? []) as Lancamento[];
-});
+    if (filtro.rubrica) q = q.eq('rubrica', filtro.rubrica);
+
+    if (filtro.busca) {
+      // `%` e `_` são curingas do LIKE. Sem escapar, quem digita "50%" recebe
+      // tudo — e o livro-caixa passa a mentir sobre o que está mostrando.
+      const termo = filtro.busca.replace(/([\\%_])/g, '\\$1');
+      q = q.ilike('descricao', `%${termo}%`);
+    }
+
+    if (limite) q = q.limit(limite);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as Lancamento[];
+  },
+);
 
 export type Totais = { entrou: number; saiu: number; saldo: number };
 
@@ -262,6 +290,28 @@ export async function propostaRetida(entidadeId: string, membroId: string | null
 }
 
 /* ── Eventos ────────────────────────────────────────────────────────────── */
+
+export type Evento = {
+  id: string;
+  nome: string;
+  slug: string;
+  data: string;
+  local: string | null;
+  capacidade: number | null;
+};
+
+/** As festas da entidade, da mais próxima para a mais antiga. */
+export const eventosDaEntidade = cache(async (entidadeId: string) => {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from('eventos')
+    .select('id, nome, slug, data, local, capacidade')
+    .eq('entidade_id', entidadeId)
+    .order('data', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as Evento[];
+});
 
 export const eventoPorSlug = cache(async (slug: string) => {
   const supabase = await criarClienteServidor();

@@ -89,6 +89,9 @@ diz o que fazer, em vez de virar 429 intermitente.
 | `/estilo` | folha de estilo | conferência |
 | `/e/[slug]` | 5a-cofre | privada, com abas |
 | `/e/[slug]/aprovacoes` | 5b-aprovações | privada, com abas |
+| `/e/[slug]/propor` | — | privada, só diretoria |
+| `/e/[slug]/festas` | — | privada, com abas |
+| `/e/[slug]/socios` | — | privada, com abas |
 | `/e/[slug]/livro` | 5c-livro-caixa | **pública, sem login** |
 | `/f/[slug]` | 5d-página da festa | pública |
 | `/perfil` | 5e-perfil | privada, com abas |
@@ -104,6 +107,7 @@ devnet de verdade.
 | `npm run typecheck` | TypeScript, sem emitir |
 | `npm run seed` | popula o banco (`-- --forcar` refaz do zero) |
 | `npm run conferir <rota>` | layout e acessibilidade da rota, contra as regras do `CLAUDE.md` |
+| `npm run nada-mockado` | varre o app inteiro atrás de link morto, controle decorativo e dado de mentira |
 | `npm run chaves` | gera os três signatários da devnet |
 | `npm run saldo` | saldo em SOL dos signatários |
 | `npm run setup` · `ciclo` · `assinar` · `executar` | o cofre pelo terminal |

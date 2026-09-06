@@ -2,6 +2,7 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  CalendarDays,
   Clock,
   Lock,
   Plus,
@@ -215,10 +216,10 @@ export default function FolhaDeEstilo() {
                 href: '/e/aaaeng/propor',
               },
               {
-                icone: ArrowUp,
-                rotulo: ['Cobrar', 'sócios'],
+                icone: CalendarDays,
+                rotulo: ['Ver', 'festas'],
                 acento: 'green',
-                href: '/e/aaaeng/cobrar',
+                href: '/e/aaaeng/festas',
               },
               {
                 icone: BookOpen,

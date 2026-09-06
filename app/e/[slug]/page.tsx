@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  CalendarDays,
   Lock,
   Plus,
   Users,
@@ -146,13 +147,16 @@ export default async function Cofre({
                   icone: Plus,
                   rotulo: ['Propor', 'saída'],
                   acento: 'blue',
-                  href: `/e/${slug}/aprovacoes?estado=vivo`,
+                  href: `/e/${slug}/propor`,
                 },
                 {
-                  icone: ArrowUp,
-                  rotulo: ['Cobrar', 'sócios'],
+                  // Era "Cobrar sócios", apontando para uma tela que nunca
+                  // existiu. Quem cobra é a festa: o ingresso cai no cofre e
+                  // vira entrada no livro-caixa sozinho.
+                  icone: CalendarDays,
+                  rotulo: ['Ver', 'festas'],
                   acento: 'green',
-                  href: `/e/${slug}/cobrar`,
+                  href: `/e/${slug}/festas`,
                 },
                 {
                   icone: BookOpen,

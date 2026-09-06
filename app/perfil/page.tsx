@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { Building2, Check, ChevronRight, LogOut, User } from 'lucide-react';
+import { Building2, Check, LogOut, User } from 'lucide-react';
 
 import { BarraAbas } from '@/components/BarraAbas';
 import { Botao } from '@/components/Botao';
@@ -218,13 +218,17 @@ function LinhaPerfil({
   return (
     <div className="flex min-h-[58px] items-center gap-[11px] rounded-[14px] border border-line bg-surface px-[13px] py-[11px]">
       <TileIcone icone={icone} acento={acento} tamanho="md" />
+      {/*
+        Sem seta. Estas linhas são informação, não navegação — o chevron
+        prometia uma tela adiante que não existe, e promessa que não se cumpre
+        é a primeira coisa em que alguém clica na apresentação.
+      */}
       <div className="min-w-0 flex-1">
         <div className="t-item-sm text-ink">{titulo}</div>
         <div className="mt-[5px] truncate text-[11.5px] leading-[1.3] text-ink-3">
           {detalhe}
         </div>
       </div>
-      <ChevronRight size={16} strokeWidth={1.7} className="flex-none text-ink-3" aria-hidden />
     </div>
   );
 }

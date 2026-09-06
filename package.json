@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "conferir": "node scripts/conferir.mjs",
     "seed": "node scripts/seed.mjs",
+    "nada-mockado": "node scripts/nada-mockado.mjs",
     "chaves": "node scripts/gerar-chaves.mjs",
     "saldo": "node scripts/saldo.mjs",
     "setup": "node scripts/cofre/setup.mjs",

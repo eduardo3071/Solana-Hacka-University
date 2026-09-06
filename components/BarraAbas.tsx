@@ -21,10 +21,13 @@ export function BarraAbas({
   ativa,
   slug,
   pendencias = 0,
+  festaHref,
 }: {
   ativa: AbaAtiva;
   slug: string;
   pendencias?: number;
+  /** Atalho direto para uma festa. Sem ele, a aba abre a lista. */
+  festaHref?: string;
 }) {
   return (
     <nav
@@ -55,8 +58,14 @@ export function BarraAbas({
         </Link>
       </div>
 
+      {/*
+        `festaHref` e não `/f/${slug}`: aquele endereço montava a página de um
+        EVENTO com o slug da ENTIDADE, e caía sempre em "evento não
+        encontrado". Uma entidade tem várias festas; o destino da aba é a
+        lista, e quem sabe qual é a próxima passa o atalho direto.
+      */}
       <Aba
-        href={`/f/${slug}`}
+        href={festaHref ?? `/e/${slug}/festas`}
         icone={Calendar}
         rotulo="Festas"
         ativa={ativa === 'festas'}

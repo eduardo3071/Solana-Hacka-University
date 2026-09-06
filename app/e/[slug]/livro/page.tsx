@@ -2,8 +2,8 @@ import { notFound } from 'next/navigation';
 import { ArrowDown, ArrowUp, Search, SlidersHorizontal } from 'lucide-react';
 
 import { Chip } from '@/components/Chip';
-import { COR_DA_RUBRICA } from '@/components/acentos';
-import { Erro, LivroVazio } from '@/components/Estados';
+import { COR_DA_RUBRICA, type Rubrica } from '@/components/acentos';
+import { Erro, LivroVazio, Vazio } from '@/components/Estados';
 import { Hero } from '@/components/Hero';
 import { CorpoTela, Tela } from '@/components/Tela';
 import { TileIcone } from '@/components/TileIcone';
@@ -17,7 +17,20 @@ import {
 } from '@/lib/dados';
 import { formatBRL, formatComSinal, formatData } from '@/lib/format';
 
-const FILTROS = ['Todas', 'Eventos', 'Marketing', 'Esporte', 'Sócios'];
+const RUBRICAS = ['Eventos', 'Marketing', 'Esporte', 'Associados'] as const;
+
+/**
+ * A prancha 5c escreve "Sócios" no chip, mas a rubrica no banco é
+ * "Associados". O rótulo é da tela, o valor é do banco — e é por isso que os
+ * dois moram aqui juntos, em vez de alguém traduzir na mão em dois lugares.
+ */
+const FILTROS: { rotulo: string; rubrica?: Rubrica }[] = [
+  { rotulo: 'Todas' },
+  { rotulo: 'Eventos', rubrica: 'Eventos' },
+  { rotulo: 'Marketing', rubrica: 'Marketing' },
+  { rotulo: 'Esporte', rubrica: 'Esporte' },
+  { rotulo: 'Sócios', rubrica: 'Associados' },
+];
 
 export async function generateMetadata({
   params,
@@ -44,10 +57,24 @@ export async function generateMetadata({
  */
 export default async function LivroCaixa({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ rubrica?: string; busca?: string }>;
 }) {
   const { slug } = await params;
+  const { rubrica, busca } = await searchParams;
+
+  // O filtro vive na URL, não em estado do cliente: assim o livro-caixa
+  // filtrado é um link que se manda no grupo, e a página continua sendo lida
+  // no servidor sob RLS.
+  const filtro = {
+    rubrica: (RUBRICAS as readonly string[]).includes(rubrica ?? '')
+      ? (rubrica as Rubrica)
+      : undefined,
+    busca: busca?.trim() || undefined,
+  };
+  const filtrando = Boolean(filtro.rubrica || filtro.busca);
 
   // A leitura da entidade entra no mesmo `try` do extrato: esta é a página que
   // circula em grupo de WhatsApp, e um erro de rede aqui não pode virar a tela
@@ -57,7 +84,7 @@ export default async function LivroCaixa({
     entidade = await entidadePorSlug(slug);
     if (entidade) {
       [linhas, soma, socios] = await Promise.all([
-        lancamentos(entidade.id),
+        lancamentos(entidade.id, undefined, filtro),
         totais(entidade.id),
         associados(entidade.id),
       ]);
@@ -111,35 +138,79 @@ export default async function LivroCaixa({
           <Total rotulo="Saldo" valor={formatBRL(soma.saldo)} cor="text-ink" />
         </div>
 
-        <div className="flex gap-2">
-          <div className="flex flex-1 items-center gap-[9px] rounded-btn border border-line bg-surface px-[13px] py-[11px]">
+        {/*
+          Formulário GET de verdade, sem JavaScript: a busca vira `?busca=` na
+          URL, a página relê no servidor sob RLS e o resultado é um link que se
+          manda no grupo. Uma caixa de busca que não busca é pior que caixa
+          nenhuma — promete e não cumpre.
+        */}
+        <form method="get" className="flex gap-2">
+          {filtro.rubrica && (
+            <input type="hidden" name="rubrica" value={filtro.rubrica} />
+          )}
+          <label htmlFor="busca" className="sr-only">
+            Buscar lançamento
+          </label>
+          <div className="flex flex-1 items-center gap-[9px] rounded-btn border border-line bg-surface px-[13px] py-[11px] focus-within:border-blue">
             <Search size={17} strokeWidth={1.8} className="text-ink-3" aria-hidden />
-            <span className="text-[13px] leading-none font-medium text-ink-3">
-              Buscar lançamento
-            </span>
+            <input
+              id="busca"
+              name="busca"
+              type="search"
+              defaultValue={filtro.busca ?? ''}
+              placeholder="Buscar lançamento"
+              /* Sem `outline-none`: o anel de foco é a única pista de onde o
+                 teclado está. A borda azul do contêiner acompanha, não
+                 substitui. */
+              className="w-full bg-transparent text-[13px] leading-none font-medium text-ink placeholder:text-ink-3"
+            />
           </div>
-          <div className="flex w-[43px] flex-none items-center justify-center rounded-btn border border-line bg-surface">
+          <button
+            type="submit"
+            aria-label="Buscar"
+            className="flex w-[43px] flex-none items-center justify-center rounded-btn border border-line bg-surface"
+          >
             <SlidersHorizontal size={17} strokeWidth={1.8} className="text-blue" aria-hidden />
-          </div>
-        </div>
+          </button>
+        </form>
 
         <div className="flex gap-[7px] overflow-x-auto">
-          {FILTROS.map((f, i) => (
-            <span
-              key={f}
-              className={`t-chip flex-none rounded-[9px] px-2.5 py-2 ${
-                i === 0
-                  ? 'bg-blue text-ground'
-                  : 'border border-line bg-surface text-ink-2'
-              }`}
-            >
-              {f}
-            </span>
-          ))}
+          {FILTROS.map((f) => {
+            const ativo = f.rubrica === filtro.rubrica;
+            const alvo = new URLSearchParams();
+            if (f.rubrica && !ativo) alvo.set('rubrica', f.rubrica);
+            if (filtro.busca) alvo.set('busca', filtro.busca);
+            const consulta = alvo.toString();
+
+            return (
+              <a
+                key={f.rotulo}
+                href={consulta ? `?${consulta}` : '?'}
+                aria-current={ativo ? 'true' : undefined}
+                className={`t-chip flex-none rounded-[9px] px-2.5 py-2 ${
+                  ativo
+                    ? 'bg-blue text-ground'
+                    : 'border border-line bg-surface text-ink-2'
+                }`}
+              >
+                {f.rotulo}
+              </a>
+            );
+          })}
         </div>
 
         {linhas.length === 0 ? (
-          <LivroVazio />
+          filtrando ? (
+            <Vazio
+              titulo="Nenhum lançamento com esse filtro"
+              acao={{ texto: 'Limpar filtro', href: '?' }}
+            >
+              O livro-caixa tem lançamentos — nenhum deles casa com o que você
+              procurou.
+            </Vazio>
+          ) : (
+            <LivroVazio />
+          )
         ) : (
           <div className="flex flex-col gap-2">
             {linhas.map((l) => (
