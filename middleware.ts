@@ -24,6 +24,16 @@ export async function middleware(request: NextRequest) {
     return comCors(NextResponse.next({ request }), origem);
   }
 
+  /*
+   * O servidor MCP também sai do portão: cliente de assistente não manda
+   * cookie, e o próprio pacote cuida de origem e de método. Ele lê com a chave
+   * anônima, então o RLS continua sendo quem decide o que aparece.
+   */
+  if (pathname === '/mcp' || pathname.startsWith('/mcp/')) {
+    return NextResponse.next({ request });
+  }
+
+
   return atualizarSessao(request);
 }
 
