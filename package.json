@@ -16,11 +16,9 @@
     "setup": "node scripts/cofre/setup.mjs",
     "ciclo": "node scripts/cofre/ciclo.mjs",
     "assinar": "node scripts/cofre/assinar.mjs",
-    "executar": "node scripts/cofre/executar.mjs",
-    "build:dev": "next build"
+    "executar": "node scripts/cofre/executar.mjs"
   },
   "dependencies": {
-    "@lovable.dev/mcp-js": "^2.0.2",
     "@solana/web3.js": "^1.98.4",
     "@sqds/multisig": "^2.1.4",
     "@supabase/ssr": "^0.5.2",
@@ -31,8 +29,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "server-only": "^0.0.1",
-    "zod": "^4.5.4"
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

@@ -28,11 +28,6 @@ const ROTAS_PUBLICAS = [
   '/estilo', // folha de estilo viva
   '/entrar', // magic link
   '/auth/confirmar', // volta do link do e-mail
-  // Servidor MCP. Cliente de assistente não manda cookie: passar pelo portão
-  // devolveria um 307 para HTML, que do outro lado aparece como erro de parse.
-  // Quem protege dado continua sendo o RLS — as ferramentas leem com a chave
-  // anônima e só enxergam o que a política abre.
-  '/mcp',
 ];
 
 function ehPublica(pathname: string): boolean {
