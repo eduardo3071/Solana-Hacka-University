@@ -34,3 +34,4 @@ npm-debug.log*
 
 # Estado do cofre na devnet: guarda a createKey do multisig.
 .cofre-devnet.json
+dist
