@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/dist.mjs",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -17,7 +17,7 @@
     "ciclo": "node scripts/cofre/ciclo.mjs",
     "assinar": "node scripts/cofre/assinar.mjs",
     "executar": "node scripts/cofre/executar.mjs",
-    "build:dev": "next build"
+    "build:dev": "next build && node scripts/dist.mjs"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",
