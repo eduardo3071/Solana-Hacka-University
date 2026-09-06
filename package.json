@@ -16,7 +16,8 @@
     "setup": "node scripts/cofre/setup.mjs",
     "ciclo": "node scripts/cofre/ciclo.mjs",
     "assinar": "node scripts/cofre/assinar.mjs",
-    "executar": "node scripts/cofre/executar.mjs"
+    "executar": "node scripts/cofre/executar.mjs",
+    "build:dev": "next build"
   },
   "dependencies": {
     "@lovable.dev/mcp-js": "^2.0.2",
