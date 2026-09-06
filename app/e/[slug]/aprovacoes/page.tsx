@@ -192,7 +192,7 @@ export default async function Aprovacoes({
           <BlocoBloqueio className="mt-3.5">
             {jaAssinei
               ? 'Falta a assinatura de outro signatário. Ao assinar, a saída é executada na hora.'
-              : `Falta ${QUORUM.de - feitas} assinatura para o quórum. Ao assinar, a saída é executada na hora.`}
+              : `${QUORUM.de - feitas === 1 ? 'Falta 1 assinatura' : `Faltam ${QUORUM.de - feitas} assinaturas`} para o quórum. Ao assinar, a saída é executada na hora.`}
           </BlocoBloqueio>
         )}
 
