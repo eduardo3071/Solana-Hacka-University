@@ -7,5 +7,5 @@ declare module '*.css';
 // O Next não declara esse formato; a declaração abaixo evita o erro de tipo sem
 // tocar no arquivo gerado.
 interface ImportMeta {
-  readonly env: Record<string, string | undefined>;
+  readonly env: Record<string, string>;
 }
