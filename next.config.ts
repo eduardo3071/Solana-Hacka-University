@@ -3,6 +3,21 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   /*
+   * A prévia gerenciada fornece as credenciais públicas com o prefixo VITE_.
+   * O app é Next e lê NEXT_PUBLIC_; este mapeamento mantém um único valor
+   * disponível no middleware, nos Server Components e no navegador.
+   */
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL ??
+      process.env.VITE_SUPABASE_URL ??
+      process.env.SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.SUPABASE_PUBLISHABLE_KEY,
+  },
+  /*
    * A raiz é esta pasta, sempre.
    *
    * Sem isto, o Next procura lockfiles pelos diretórios acima e, se achar um
